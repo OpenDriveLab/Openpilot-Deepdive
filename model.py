@@ -1,5 +1,4 @@
 import torch
-from torch._C import get_num_interop_threads
 import torch.nn as nn
 
 from efficientnet_pytorch import EfficientNet
@@ -68,7 +67,6 @@ class MultipleTrajectoryPredictionLoss(nn.Module):
         reg_loss = self.reg_loss(pred_trajectory, gt)
 
         return cls_loss, reg_loss
-
 
 
 if __name__ == '__main__':
