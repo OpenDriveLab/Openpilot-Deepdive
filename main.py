@@ -1,55 +1,57 @@
+import os
+from re import M
 import torch
-import torch.nn as nn
+from torch import nn
+import torch.nn.functional as F
 
-from tqdm import tqdm
 from data import PlanningDataset
 from model import PlaningNetwork, MultipleTrajectoryPredictionLoss
 from torch import optim
 from torch.utils.data import DataLoader
+import pytorch_lightning as pl
 
 
-def main(model, train_loader, val_loader, criterion, optimizer, scheduler):
-    device = 'cuda:0'
-    model.to(device)
+# Hyper-Parameters
+LR = 1e-3
+BATCH_SIZE = 4
+N_WORKERS = 2
 
-    for epoch in tqdm(range(EPOCHS), ncols=0, postfix='Epoch'):
-        # Training
-        model.train()
-        for inputs, labels in train_loader:
-            inputs = inputs.to(device)
-            labels = labels.to(device)
+class PlanningBaselineV0(pl.LightningModule):
+    def __init__(self, M, num_pts, mtp_alpha) -> None:
+        super().__init__()
+        self.M = M
+        self.num_pts = num_pts
+        self.mtp_alpha = mtp_alpha
 
-            # zero the parameter gradients
-            optimizer.zero_grad()
+        self.net = PlaningNetwork(M, num_pts)
+        self.mtp_loss = MultipleTrajectoryPredictionLoss(mtp_alpha, M, num_pts, distance_type='angle')
 
-            pred_cls, pred_trajectory = model(inputs)
-            cls_loss, reg_loss = criterion(pred_cls, pred_trajectory, labels)
+    def forward(self, x):
+        # in lightning, forward defines the prediction/inference actions
+        return self.net(x)
 
-            loss = cls_loss + MTPLOSS_ALPHA * reg_loss
-            loss.backward()
-            optimizer.step()
+    def training_step(self, batch, batch_idx):
+        # training_step defines the train loop. It is independent of forward
+        inputs, labels = batch
+        pred_cls, pred_trajectory = self.net(inputs)
+        cls_loss, reg_loss = self.mtp_loss(pred_cls, pred_trajectory, labels)
+        self.log('cls_loss', cls_loss)
+        self.log('reg_loss', reg_loss)
+        return cls_loss + reg_loss
 
-            print(loss.item())
-
-        scheduler.step()
+    def configure_optimizers(self):
+        optimizer = optim.Adam(self.parameters(), lr=LR)
+        return optimizer
 
 
 if __name__ == "__main__":
-    # HyperParameters
-    BATCH_SIZE = 4
-    LR = 1e-3
-    EPOCHS = 20
-    MTPLOSS_ALPHA = 1.0
 
-    model = PlaningNetwork(3, 20)
-    train_data = PlanningDataset(split='train')
-    val_data = PlanningDataset(split='val')
-    criterion = MultipleTrajectoryPredictionLoss(MTPLOSS_ALPHA, 3, 20, )
+    train = PlanningDataset(split='train')
+    val = PlanningDataset(split='val')
+    train_loader = DataLoader(train, BATCH_SIZE, shuffle=True, num_workers=N_WORKERS)
+    val_loader = DataLoader(train, BATCH_SIZE, num_workers=N_WORKERS)
 
-    train_loader = DataLoader(train_data, BATCH_SIZE, shuffle=True)
-    val_loader = DataLoader(val_data, BATCH_SIZE, shuffle=False)
+    planning_v0 = PlanningBaselineV0(M=3, num_pts=20, mtp_alpha=1.0)
+    trainer = pl.Trainer(gpus=1)
 
-    optimizer = optim.Adam(model.parameters())
-    scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.1)
-
-    main(model, train_loader, val_loader, criterion, optimizer, scheduler)
+    trainer.fit(planning_v0, train_loader, val_loader)

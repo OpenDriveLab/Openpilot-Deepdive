@@ -1,2 +1,3 @@
 nuscenes-devkit
 efficientnet_pytorch
+pytorch-lightning

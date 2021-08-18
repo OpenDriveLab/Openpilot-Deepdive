@@ -64,7 +64,7 @@ class MultipleTrajectoryPredictionLoss(nn.Module):
         pred_trajectory = pred_trajectory[torch.tensor(range(len(gt_cls)), device=gt_cls.device), index, ...]  # B, num_pts, 3
 
         cls_loss = self.cls_loss(pred_cls, gt_cls)
-        reg_loss = self.reg_loss(pred_trajectory, gt)
+        reg_loss = self.reg_loss(torch.tanh(pred_trajectory), torch.tanh(gt))
 
         return cls_loss, reg_loss
 

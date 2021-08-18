@@ -6,7 +6,6 @@ import numpy as np
 from PIL import Image
 from torch.utils.data import Dataset
 from torchvision import transforms
-from torchvision.transforms.transforms import Resize, ToTensor
 
 
 class PlanningDataset(Dataset):
@@ -46,28 +45,54 @@ if __name__ == '__main__':
 
     dataset = PlanningDataset(split='val')
 
-    # Calculating the stats of the dataset
-    # placeholders
-    psum    = torch.tensor([0.0, 0.0, 0.0])
-    psum_sq = torch.tensor([0.0, 0.0, 0.0])
+    calculate_image_mean_std = False
+    if calculate_image_mean_std:
+        # Calculating the stats of the images
+        psum    = torch.tensor([0.0, 0.0, 0.0])
+        psum_sq = torch.tensor([0.0, 0.0, 0.0])
 
-    # loop through images
-    for img, _ in tqdm(dataset):
-        inputs = img[0:3]
-        inputs = inputs[None]
-        psum    += inputs.sum(axis        = [0, 2, 3])
-        psum_sq += (inputs ** 2).sum(axis = [0, 2, 3])
-    # pixel count
-    count = len(dataset) * 900 * 1600
+        # loop through images
+        for img, _ in tqdm(dataset):
+            inputs = img[0:3]
+            inputs = inputs[None]
+            psum    += inputs.sum(axis        = [0, 2, 3])
+            psum_sq += (inputs ** 2).sum(axis = [0, 2, 3])
+        # pixel count
+        count = len(dataset) * 900 * 1600
 
-    # mean and std
-    total_mean = psum / count
-    total_var  = (psum_sq / count) - (total_mean ** 2)
-    total_std  = torch.sqrt(total_var)
+        # mean and std
+        total_mean = psum / count
+        total_var  = (psum_sq / count) - (total_mean ** 2)
+        total_std  = torch.sqrt(total_var)
 
-    # output
-    print('mean: '  + str(total_mean))  # [0.3890, 0.3937, 0.3851]
-    print('std:  '  + str(total_std))   # [0.2172, 0.2141, 0.2209]
+        # output
+        print('mean: '  + str(total_mean))  # [0.3890, 0.3937, 0.3851]
+        print('std:  '  + str(total_std))   # [0.2172, 0.2141, 0.2209]
+
+    calculate_poses_mean_std = True
+    if calculate_poses_mean_std:
+        import matplotlib.pyplot as plt
+
+        poses_list = []
+        for _, poses in tqdm(DataLoader(dataset, shuffle=True)):
+            poses_list += list(p.numpy()[None, ] for p in poses[0])
+            if len(poses_list) > 40000:
+                break
+
+        poses = np.concatenate(poses_list, axis=0)
+        print('mean: ', np.mean(poses, axis=0))
+        print('std:  ', np.std(poses, axis=0))
+
+        plt.hist(poses[:, 0], bins=200, )
+        plt.show()
+
+        plt.hist(poses[:, 1], bins=200, )
+        plt.show()
+
+        plt.hist(poses[:, 2], bins=200, )
+        plt.show()
+
+    exit()
 
     dataloader = DataLoader(dataset, batch_size=8, shuffle=True)
 
