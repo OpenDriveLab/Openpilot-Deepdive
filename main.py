@@ -12,9 +12,9 @@ import pytorch_lightning as pl
 
 
 # Hyper-Parameters
-LR = 1e-3
-BATCH_SIZE = 4
-N_WORKERS = 2
+LR = 1e-2
+BATCH_SIZE = 32
+N_WORKERS = 8
 
 class PlanningBaselineV0(pl.LightningModule):
     def __init__(self, M, num_pts, mtp_alpha) -> None:
@@ -35,9 +35,12 @@ class PlanningBaselineV0(pl.LightningModule):
         inputs, labels = batch
         pred_cls, pred_trajectory = self.net(inputs)
         cls_loss, reg_loss = self.mtp_loss(pred_cls, pred_trajectory, labels)
-        self.log('cls_loss', cls_loss)
-        self.log('reg_loss', reg_loss)
-        return cls_loss + reg_loss
+        self.log('loss/cls', cls_loss)
+        self.log('loss/reg', reg_loss.mean())
+        self.log('loss/reg_x', reg_loss[0])
+        self.log('loss/reg_y', reg_loss[1])
+        self.log('loss/reg_z', reg_loss[2])
+        return cls_loss + self.mtp_alpha * reg_loss.mean()
 
     def configure_optimizers(self):
         optimizer = optim.Adam(self.parameters(), lr=LR)
@@ -52,6 +55,7 @@ if __name__ == "__main__":
     val_loader = DataLoader(train, BATCH_SIZE, num_workers=N_WORKERS)
 
     planning_v0 = PlanningBaselineV0(M=3, num_pts=20, mtp_alpha=1.0)
-    trainer = pl.Trainer(gpus=1)
+    trainer = pl.Trainer(gpus=4, accelerator='ddp', profiler='simple', benchmark=True,
+                         resume_from_checkpoint="lightning_logs/version_3242284/checkpoints/epoch=33-step=13871.ckpt")
 
     trainer.fit(planning_v0, train_loader, val_loader)

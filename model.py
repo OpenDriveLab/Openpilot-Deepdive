@@ -42,7 +42,7 @@ class MultipleTrajectoryPredictionLoss(nn.Module):
         else:
             raise NotImplementedError
         self.cls_loss = nn.CrossEntropyLoss()
-        self.reg_loss = nn.SmoothL1Loss()
+        self.reg_loss = nn.SmoothL1Loss(reduction='none')
 
     def forward(self, pred_cls, pred_trajectory, gt):
         """
@@ -64,7 +64,7 @@ class MultipleTrajectoryPredictionLoss(nn.Module):
         pred_trajectory = pred_trajectory[torch.tensor(range(len(gt_cls)), device=gt_cls.device), index, ...]  # B, num_pts, 3
 
         cls_loss = self.cls_loss(pred_cls, gt_cls)
-        reg_loss = self.reg_loss(torch.tanh(pred_trajectory), torch.tanh(gt))
+        reg_loss = self.reg_loss(pred_trajectory, gt).mean(dim=(0, 1))
 
         return cls_loss, reg_loss
 
