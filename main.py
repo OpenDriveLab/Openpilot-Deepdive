@@ -52,7 +52,7 @@ if __name__ == "__main__":
     train = PlanningDataset(split='train')
     val = PlanningDataset(split='val')
     train_loader = DataLoader(train, BATCH_SIZE, shuffle=True, num_workers=N_WORKERS)
-    val_loader = DataLoader(train, BATCH_SIZE, num_workers=N_WORKERS)
+    val_loader = DataLoader(val, BATCH_SIZE, num_workers=N_WORKERS)
 
     planning_v0 = PlanningBaselineV0(M=3, num_pts=20, mtp_alpha=1.0)
     trainer = pl.Trainer(gpus=4, accelerator='ddp', profiler='simple', benchmark=True,
