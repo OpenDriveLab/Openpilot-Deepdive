@@ -30,11 +30,12 @@ def get_samples(nusc, scenes):
             img_tokens = scene[idx:idx+NUM_RGB_IMGS]
             point_tokens = scene[idx+NUM_RGB_IMGS:idx+NUM_RGB_IMGS+NUM_FUTURE_TRAJECTORY_PTS]
             
+            cam_front_data = nusc.get('sample_data', nusc.get('sample', cur_token)['data']['CAM_FRONT'])
             # Images
             imgs = list(nusc.get('sample_data', nusc.get('sample', token)['data']['CAM_FRONT'])['filename'] for token in img_tokens)
             
-            cur_ego_pose = nusc.get('ego_pose', nusc.get('sample_data', nusc.get('sample', cur_token)['data']['CAM_FRONT'])['ego_pose_token'])
-            
+            # Ego poses
+            cur_ego_pose = nusc.get('ego_pose', cam_front_data['ego_pose_token'])
             ego_rotation_matrix = Rotation.from_quat(np.array(cur_ego_pose['rotation'])[[1,2,3,0]]).as_matrix()
             ego_tranlation = np.array(cur_ego_pose['translation'])
             ego_rotation_matrix_inv = np.linalg.inv(ego_rotation_matrix)
@@ -44,7 +45,23 @@ def get_samples(nusc, scenes):
             future_poses = list(ego_rotation_matrix_inv @ (np.array(future_pose)+ego_tranlation_inv) for future_pose in future_poses)
             future_poses = list(list(p) for p in future_poses)  # for json
 
-            samples.append(dict(imgs=imgs, future_poses=future_poses))
+            # Camera Matrices
+            calibration_para = nusc.get('calibrated_sensor', cam_front_data['calibrated_sensor_token'])
+            camera_intrinsic = np.array(calibration_para['camera_intrinsic'])
+            camera_rotation_matrix = Rotation.from_quat(np.array(calibration_para['rotation'])[[1,2,3,0]]).as_matrix()
+            camera_translation = np.array(calibration_para['translation'])
+            camera_rotation_matrix_inv = np.linalg.inv(camera_rotation_matrix)
+            camera_translation_inv = -camera_translation
+            camera_extrinsic = np.vstack((np.hstack((camera_rotation_matrix_inv, camera_translation_inv.reshape((3, 1)))), np.array([0, 0, 0, 1])))
+
+            samples.append(dict(
+                imgs=imgs,
+                future_poses=future_poses,
+                camera_intrinsic=camera_intrinsic.tolist(),
+                camera_extrinsic=camera_extrinsic.tolist(),
+                camera_translation_inv=camera_translation_inv.tolist(),
+                camera_rotation_matrix_inv=camera_rotation_matrix_inv.tolist(),
+            ))
 
     return samples
 
