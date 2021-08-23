@@ -55,7 +55,11 @@ if __name__ == "__main__":
     val_loader = DataLoader(val, BATCH_SIZE, num_workers=N_WORKERS)
 
     planning_v0 = PlanningBaselineV0(M=3, num_pts=20, mtp_alpha=1.0)
-    trainer = pl.Trainer(gpus=4, accelerator='ddp', profiler='simple', benchmark=True,
-                         resume_from_checkpoint="lightning_logs/version_3242284/checkpoints/epoch=33-step=13871.ckpt")
+    trainer = pl.Trainer(gpus=4,
+                         accelerator='ddp',
+                         profiler='simple',
+                         benchmark=True,
+                         gradient_clip_val=1,
+                         )
 
     trainer.fit(planning_v0, train_loader, val_loader)
