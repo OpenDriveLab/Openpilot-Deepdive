@@ -32,7 +32,7 @@ class PlanningBaselineV0(pl.LightningModule):
 
     def training_step(self, batch, batch_idx):
         # training_step defines the train loop. It is independent of forward
-        inputs, labels = batch
+        inputs, labels = batch['input_img'], batch['future_poses']
         pred_cls, pred_trajectory = self.net(inputs)
         cls_loss, reg_loss = self.mtp_loss(pred_cls, pred_trajectory, labels)
         self.log('loss/cls', cls_loss)
