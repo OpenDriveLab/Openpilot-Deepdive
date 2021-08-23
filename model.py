@@ -14,18 +14,15 @@ class PlaningNetwork(nn.Module):
             nn.AdaptiveAvgPool2d(1),
             nn.Flatten(),
             nn.Dropout(0.3),
+            nn.Linear(1408, M * (num_pts * 3 + 1))  # +1 for cls
         )
-
-        self.trajectory_head = nn.Linear(1408, M * num_pts * 3)
-        self.classification_head = nn.Linear(1408, M)
 
     def forward(self, x):
         features = self.backbone.extract_features(x)
-        tip_features = self.plan_head(features)
-
-        pred_cls = self.classification_head(tip_features)
-        pred_trajectory = self.trajectory_head(tip_features)
-
+        raw_preds = self.plan_head(features)
+        pred_cls = raw_preds[:, :self.M]
+        pred_trajectory = raw_preds[:, self.M:]
+        pred_trajectory[:, ::3] = pred_trajectory[:, ::3].exp()
         return pred_cls, pred_trajectory
 
 

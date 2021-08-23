@@ -34,7 +34,10 @@ class PlanningDataset(Dataset):
         imgs = list(Image.open(os.path.join(self.img_root, p)) for p in imgs)
         imgs = list(self.transforms(img) for img in imgs)
         input_img = torch.cat(imgs, dim=0)
+        
+        # process future_poses
         future_poses = torch.tensor(future_poses)
+        future_poses[:, 0] = future_poses[:, 0].clamp(1e-2, )  # the car will never go backward
 
         return input_img, future_poses
 
