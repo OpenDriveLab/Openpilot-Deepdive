@@ -13,7 +13,7 @@ class PlaningNetwork(nn.Module):
         self.plan_head = nn.Sequential(
             nn.AdaptiveAvgPool2d(1),
             nn.Flatten(),
-            nn.Dropout(0.3),
+            # nn.Dropout(0.3),
             nn.Linear(1408, M * (num_pts * 3 + 1))  # +1 for cls
         )
 

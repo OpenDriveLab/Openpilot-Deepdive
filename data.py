@@ -39,7 +39,14 @@ class PlanningDataset(Dataset):
         future_poses = torch.tensor(future_poses)
         future_poses[:, 0] = future_poses[:, 0].clamp(1e-2, )  # the car will never go backward
 
-        return input_img, future_poses
+        return dict(
+            input_img=input_img,
+            future_poses=future_poses,
+            camera_intrinsic=torch.tensor(sample['camera_intrinsic']),
+            camera_extrinsic=torch.tensor(sample['camera_extrinsic']),
+            camera_translation_inv=torch.tensor(sample['camera_translation_inv']),
+            camera_rotation_matrix_inv=torch.tensor(sample['camera_rotation_matrix_inv']),
+        )
 
 
 if __name__ == '__main__':
