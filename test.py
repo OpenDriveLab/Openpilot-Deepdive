@@ -9,12 +9,12 @@ from torch.utils.data import DataLoader
 import matplotlib.pyplot as plt
 
 val = PlanningDataset(split='train')
-val_loader = DataLoader(val, 1, num_workers=0, shuffle=True)
+val_loader = DataLoader(val, 1, num_workers=0, shuffle=False)
 
 planning_v0 = PlanningBaselineV0.load_from_checkpoint('epoch=430-step=43961.ckpt', M=3, num_pts=20, mtp_alpha=1.0)
 planning_v0.eval()
 
-for batch in val_loader:
+for b_idx, batch in enumerate(val_loader):
     inputs, labels = batch['input_img'], batch['future_poses']
     camera_rotation_matrix_inv=batch['camera_rotation_matrix_inv'].numpy()[0]
     camera_translation_inv=batch['camera_translation_inv'].numpy()[0]
@@ -57,4 +57,4 @@ for batch in val_loader:
         ax4.plot(proj_trajectory[:, 0], proj_trajectory[:, 1], 'o-', label='pred - conf %.3f' % pred_conf_single)
 
     ax4.legend()
-    plt.show()
+    plt.savefig('vis/%d.png' % b_idx)
