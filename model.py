@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 from efficientnet_pytorch import EfficientNet
 
@@ -13,8 +14,13 @@ class PlaningNetwork(nn.Module):
         self.plan_head = nn.Sequential(
             nn.AdaptiveAvgPool2d(1),
             nn.Flatten(),
+            nn.BatchNorm1d(1408),
+            nn.ReLU(),
+            nn.Linear(1408, 4096),
+            nn.BatchNorm1d(4096),
+            nn.ReLU(),
             # nn.Dropout(0.3),
-            nn.Linear(1408, M * (num_pts * 3 + 1))  # +1 for cls
+            nn.Linear(4096, M * (num_pts * 3 + 1))  # +1 for cls
         )
 
     def forward(self, x):
@@ -39,6 +45,7 @@ class MultipleTrajectoryPredictionLoss(nn.Module):
         else:
             raise NotImplementedError
         self.cls_loss = nn.CrossEntropyLoss()
+        # self.cls_loss = nn.MSELoss()
         self.reg_loss = nn.SmoothL1Loss(reduction='none')
 
     def forward(self, pred_cls, pred_trajectory, gt):
@@ -60,7 +67,15 @@ class MultipleTrajectoryPredictionLoss(nn.Module):
         gt_cls = index
         pred_trajectory = pred_trajectory[torch.tensor(range(len(gt_cls)), device=gt_cls.device), index, ...]  # B, num_pts, 3
 
-        cls_loss = self.cls_loss(pred_cls, gt_cls)
+        if isinstance(self.cls_loss, nn.CrossEntropyLoss):
+            cls_loss = self.cls_loss(pred_cls, gt_cls)
+        elif isinstance(self.cls_loss, nn.MSELoss):
+            gt_cls_target = torch.zeros_like(pred_cls)
+            gt_cls_target[torch.tensor(range(len(gt_cls)), device=gt_cls.device), index] = 1
+            cls_loss = self.cls_loss(torch.sigmoid(pred_cls), gt_cls_target)
+        else:
+            raise NotImplementedError()
+
         reg_loss = self.reg_loss(pred_trajectory, gt).mean(dim=(0, 1))
 
         return cls_loss, reg_loss
