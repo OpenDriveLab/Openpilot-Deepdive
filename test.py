@@ -8,11 +8,11 @@ from torch.utils.data import DataLoader
 
 import matplotlib.pyplot as plt
 
-val = PlanningDataset(split='train')
+val = PlanningDataset(split='val')
 val_loader = DataLoader(val, 1, num_workers=0, shuffle=False)
 
-planning_v0 = PlanningBaselineV0.load_from_checkpoint('epoch=430-step=43961.ckpt', M=3, num_pts=20, mtp_alpha=1.0)
-planning_v0.eval()
+planning_v0 = PlanningBaselineV0.load_from_checkpoint('epoch=910-step=92921.ckpt', M=3, num_pts=20, mtp_alpha=1.0, lr=0)
+planning_v0.eval().cuda()
 
 for b_idx, batch in enumerate(val_loader):
     inputs, labels = batch['input_img'], batch['future_poses']
@@ -21,9 +21,9 @@ for b_idx, batch in enumerate(val_loader):
     camera_intrinsic=batch['camera_intrinsic'].numpy()[0]
 
     with torch.no_grad():
-        pred_cls, pred_trajectory = planning_v0(inputs)
-        pred_conf = softmax(pred_cls, dim=-1).numpy()[0]
-        pred_trajectory = pred_trajectory.reshape(3, 20, 3).numpy()
+        pred_cls, pred_trajectory = planning_v0(inputs.cuda())
+        pred_conf = softmax(pred_cls, dim=-1).cpu().numpy()[0]
+        pred_trajectory = pred_trajectory.reshape(3, 20, 3).cpu().numpy()
 
     vis_img = (inputs.permute(0, 2, 3, 1)[0] + torch.tensor((0.3890, 0.3937, 0.3851, 0.3890, 0.3937, 0.3851)) ) * torch.tensor((0.2172, 0.2141, 0.2209, 0.2172, 0.2141, 0.2209)) * 255
     vis_img = vis_img.clamp(0, 255)
@@ -36,12 +36,12 @@ for b_idx, batch in enumerate(val_loader):
     ax2.imshow(img_1)
     ax2.set_title('current')
 
-    ax3.plot(-pred_trajectory[0, :, 1], pred_trajectory[0, :, 0], 'o-', label='pred0 - conf %.3f' % pred_conf[0])
-    ax3.plot(-pred_trajectory[1, :, 1], pred_trajectory[1, :, 0], 'o-', label='pred1 - conf %.3f' % pred_conf[1])
-    ax3.plot(-pred_trajectory[2, :, 1], pred_trajectory[2, :, 0], 'o-', label='pred2 - conf %.3f' % pred_conf[2])
+    ax3.plot(-pred_trajectory[0, :, 1], pred_trajectory[0, :, 0], 'o-', label='pred0 - conf %.3f' % pred_conf[0], alpha=pred_conf[0].clip(0.1))
+    ax3.plot(-pred_trajectory[1, :, 1], pred_trajectory[1, :, 0], 'o-', label='pred1 - conf %.3f' % pred_conf[1], alpha=pred_conf[1].clip(0.1))
+    ax3.plot(-pred_trajectory[2, :, 1], pred_trajectory[2, :, 0], 'o-', label='pred2 - conf %.3f' % pred_conf[2], alpha=pred_conf[2].clip(0.1))
     ax3.plot(-labels[0, :, 1], labels[0, :, 0], 'o-', label='gt')
-    # ax3.set_xlim(-15, 15)
-    # ax3.set_ylim(0, 50)
+    ax3.set_xlim(-30, 30)
+    ax3.set_ylim(0, 100)
     ax3.legend()
 
     ax4.imshow(img_1)
@@ -54,7 +54,9 @@ for b_idx, batch in enumerate(val_loader):
         proj_trajectory /= 2
         proj_trajectory = proj_trajectory[(proj_trajectory[..., 0] > 0) & (proj_trajectory[..., 0] < 800)]
         proj_trajectory = proj_trajectory[(proj_trajectory[..., 1] > 0) & (proj_trajectory[..., 1] < 450)]
-        ax4.plot(proj_trajectory[:, 0], proj_trajectory[:, 1], 'o-', label='pred - conf %.3f' % pred_conf_single)
+        ax4.plot(proj_trajectory[:, 0], proj_trajectory[:, 1], 'o-', label='pred - conf %.3f' % pred_conf_single, alpha=np.clip(pred_conf_single, 0.1, np.Inf))
 
     ax4.legend()
-    plt.savefig('vis/%d.png' % b_idx)
+    plt.tight_layout()
+    plt.savefig('vis_new/%04d.png' % b_idx)
+    plt.close(fig)
