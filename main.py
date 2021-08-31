@@ -74,7 +74,7 @@ class PlanningBaselineV0(pl.LightningModule):
         bs = len(pred_cls)
         pred_trajectory = pred_trajectory.reshape(-1, self.M, self.num_pts, 3)  # B, M, num_pts, 3
 
-        pred_label = torch.argmax(pred_cls, -1)
+        pred_label = torch.argmax(pred_cls, -1)  # B,
 
         # Prediction L2 loss
         pred_trajectory_single = pred_trajectory[torch.tensor(range(bs), device=pred_cls.device), pred_label, ...]
@@ -83,10 +83,11 @@ class PlanningBaselineV0(pl.LightningModule):
         # cls Acc
         gt_trajectory_M = labels[:, None, ...].expand(-1, self.M, -1, -1)
         l2_distances = F.mse_loss(pred_trajectory, gt_trajectory_M, reduction='none').sum(dim=(2, 3))  # B, M
-        best_match = torch.argmin(l2_distances, -1)
-        cls_acc = torch.sum(best_match == pred_label) / bs
+        best_match = torch.argmin(l2_distances, -1)  # B,
+        # cls_acc = torch.sum(best_match == pred_label) / bs
 
-        self.log_dict({'val/l2_dist': l2_dist, 'val/cls_acc': cls_acc})
+        self.log_dict({'val/l2_dist': l2_dist, 'val/cls_acc': best_match == pred_label})
+        # Pytorch-lightning will collect those binary values and calculate the mean
 
 
 if __name__ == "__main__":
