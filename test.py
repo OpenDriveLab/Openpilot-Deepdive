@@ -45,8 +45,9 @@ for b_idx, batch in enumerate(val_loader):
     ax3.legend()
 
     ax4.imshow(img_1)
-    pred_trajectory = list(pred_trajectory) + [batch['future_poses'].numpy()[0], ]
-    pred_conf = list(pred_conf) + [1, ]
+    pred_mask = np.argmax(pred_conf)
+    pred_trajectory = [pred_trajectory[pred_mask, ...], ] + [batch['future_poses'].numpy()[0], ]
+    pred_conf = [pred_conf[pred_mask], ] + [1, ]
     for pred_trajectory_single, pred_conf_single in zip(pred_trajectory, pred_conf):
         location = list((p + camera_translation_inv for p in pred_trajectory_single))
         proj_trajectory = np.array(list((camera_intrinsic @ (camera_rotation_matrix_inv @ l) for l in location)))
@@ -54,9 +55,9 @@ for b_idx, batch in enumerate(val_loader):
         proj_trajectory /= 2
         proj_trajectory = proj_trajectory[(proj_trajectory[..., 0] > 0) & (proj_trajectory[..., 0] < 800)]
         proj_trajectory = proj_trajectory[(proj_trajectory[..., 1] > 0) & (proj_trajectory[..., 1] < 450)]
-        ax4.plot(proj_trajectory[:, 0], proj_trajectory[:, 1], 'o-', label='pred - conf %.3f' % pred_conf_single, alpha=np.clip(pred_conf_single, 0.1, np.Inf))
+        ax4.plot(proj_trajectory[:, 0], proj_trajectory[:, 1], 'o-', label='gt' if pred_conf_single == 1.0 else 'pred - conf %.3f' % pred_conf_single, alpha=np.clip(pred_conf_single, 0.1, np.Inf))
 
     ax4.legend()
     plt.tight_layout()
-    plt.savefig('vis_new/%04d.png' % b_idx)
+    plt.savefig('vis_yet_another_new/%04d.png' % b_idx)
     plt.close(fig)
