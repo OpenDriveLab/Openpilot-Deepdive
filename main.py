@@ -49,7 +49,7 @@ class PlanningBaselineV0(pl.LightningModule):
         self.log('loss/reg_z', reg_loss[2])
 
         if batch_idx % 10 == 0:
-            trajectories = list(pred_trajectory[0].detach().cpu().numpy().reshape(-1, self.M, self.num_pts, 3))  # M, num_pts, 3
+            trajectories = list(pred_trajectory[0].detach().cpu().numpy().reshape(self.M, self.num_pts, 3))  # M, num_pts, 3
             trajectories.append(labels[0].detach().cpu().numpy())
             confs = list(F.softmax(pred_cls[0].detach().cpu(), dim=-1).numpy()) + [1, ] # M,
 
