@@ -1,3 +1,4 @@
+from utils import draw_trajectory_on_ax
 import torch
 import numpy as np
 from torch.nn.functional import softmax
@@ -36,13 +37,9 @@ for b_idx, batch in enumerate(val_loader):
     ax2.imshow(img_1)
     ax2.set_title('current')
 
-    ax3.plot(-pred_trajectory[0, :, 1], pred_trajectory[0, :, 0], 'o-', label='pred0 - conf %.3f' % pred_conf[0], alpha=pred_conf[0].clip(0.1))
-    ax3.plot(-pred_trajectory[1, :, 1], pred_trajectory[1, :, 0], 'o-', label='pred1 - conf %.3f' % pred_conf[1], alpha=pred_conf[1].clip(0.1))
-    ax3.plot(-pred_trajectory[2, :, 1], pred_trajectory[2, :, 0], 'o-', label='pred2 - conf %.3f' % pred_conf[2], alpha=pred_conf[2].clip(0.1))
-    ax3.plot(-labels[0, :, 1], labels[0, :, 0], 'o-', label='gt')
-    ax3.set_xlim(-30, 30)
-    ax3.set_ylim(0, 100)
-    ax3.legend()
+    trajectories = list(pred_trajectory) + list(labels)
+    confs = list(pred_conf) + [1, ]
+    ax3 = draw_trajectory_on_ax(ax3, trajectories, confs)
 
     ax4.imshow(img_1)
     pred_mask = np.argmax(pred_conf)
