@@ -18,6 +18,7 @@ class PlanningDataset(Dataset):
         self.transforms = transforms.Compose(
             [
                 transforms.Resize((900 // 2, 1600 // 2)),
+                # transforms.Resize((9 * 32, 16 * 32)),
                 transforms.ToTensor(),
                 transforms.Normalize([0.3890, 0.3937, 0.3851],
                                      [0.2172, 0.2141, 0.2209]),

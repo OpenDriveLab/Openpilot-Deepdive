@@ -6,9 +6,10 @@ from torch import optim
 from torch.utils.data import DataLoader
 
 from argparse import ArgumentParser
+
 from data import PlanningDataset
 from model import PlaningNetwork, MultipleTrajectoryPredictionLoss
-from utils import draw_trajectory_on_ax
+from utils import draw_trajectory_on_ax, get_val_metric
 import pytorch_lightning as pl
 import matplotlib.pyplot as plt
 from pytorch_lightning.callbacks import LearningRateMonitor
@@ -63,29 +64,17 @@ class PlanningBaselineV0(pl.LightningModule):
 
     def configure_optimizers(self):
         optimizer = optim.Adam(self.parameters(), lr=self.lr, weight_decay=0.01)
-        lr_scheduler = optim.lr_scheduler.StepLR(optimizer, 10, 0.9)
+        lr_scheduler = optim.lr_scheduler.StepLR(optimizer, 20, 0.9)
         # optimizer = optim.SGD(self.parameters(), lr=LR, momentum=0.9, weight_decay=0.01)
         return [optimizer], [lr_scheduler]
 
     def validation_step(self, batch, batch_idx):
         inputs, labels = batch['input_img'], batch['future_poses']
         pred_cls, pred_trajectory = self.net(inputs)
-        bs = len(pred_cls)
-        pred_trajectory = pred_trajectory.reshape(-1, self.M, self.num_pts, 3)  # B, M, num_pts, 3
 
-        pred_label = torch.argmax(pred_cls, -1)  # B,
+        metrics = get_val_metric(pred_cls, pred_trajectory.view(-1, self.M, self.num_pts, 3), labels)
 
-        # Prediction L2 loss
-        pred_trajectory_single = pred_trajectory[torch.tensor(range(bs), device=pred_cls.device), pred_label, ...]
-        l2_dist = F.mse_loss(pred_trajectory_single, labels)
-
-        # cls Acc
-        gt_trajectory_M = labels[:, None, ...].expand(-1, self.M, -1, -1)
-        l2_distances = F.mse_loss(pred_trajectory, gt_trajectory_M, reduction='none').sum(dim=(2, 3))  # B, M
-        best_match = torch.argmin(l2_distances, -1)  # B,
-        # cls_acc = torch.sum(best_match == pred_label) / bs
-
-        self.log_dict({'val/l2_dist': l2_dist, 'val/cls_acc': best_match == pred_label})
+        self.log_dict(metrics)
         # Pytorch-lightning will collect those binary values and calculate the mean
 
 
