@@ -49,6 +49,8 @@ def get_val_metric(pred_cls, pred_trajectory, labels, namespace='val'):
 
     for min_dst, max_dst in distance_splits:
         points_mask = (x_distances >= min_dst) & (x_distances < max_dst)  # B, num_pts,
+        if points_mask.sum() == 0:
+            continue  # No gt points in this range
         rtn_dict.update({'eucliden_%d_%d' % (min_dst, max_dst): euclidean_distances[points_mask]})  # [sum(mask), ]
 
         for AP_threshold in AP_thresholds:
