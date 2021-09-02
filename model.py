@@ -27,9 +27,12 @@ class PlaningNetwork(nn.Module):
         features = self.backbone.extract_features(x)
         raw_preds = self.plan_head(features)
         pred_cls = raw_preds[:, :self.M]
-        pred_trajectory = raw_preds[:, self.M:]
-        pred_trajectory[:, ::3] = pred_trajectory[:, ::3].exp()
-        return pred_cls, pred_trajectory
+        pred_trajectory = raw_preds[:, self.M:].reshape(-1, self.M, self.num_pts, 3)
+
+        pred_xs = pred_trajectory[:, :, :, 0:1].exp()
+        pred_ys = pred_trajectory[:, :, :, 1:2].sinh()
+        pred_zs = pred_trajectory[:, :, :, 2:3]
+        return pred_cls, torch.cat((pred_xs, pred_ys, pred_zs), dim=3)
 
 
 class MultipleTrajectoryPredictionLoss(nn.Module):
