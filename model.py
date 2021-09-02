@@ -48,7 +48,6 @@ class MultipleTrajectoryPredictionLoss(nn.Module):
         else:
             raise NotImplementedError
         self.cls_loss = nn.CrossEntropyLoss()
-        # self.cls_loss = nn.MSELoss()
         self.reg_loss = nn.SmoothL1Loss(reduction='none')
 
     def forward(self, pred_cls, pred_trajectory, gt):
@@ -66,31 +65,11 @@ class MultipleTrajectoryPredictionLoss(nn.Module):
             
             distances = 1 - self.distance_func(pred_end_positions, gt_end_positions)  # B, M
             index = distances.argmin(dim=1)  # B
-        
-        debug = False
-        if debug:
-            print(distances, index)
-            import matplotlib.pyplot as plt
-            fig, ax = plt.subplots()
-            ax.plot(-pred_trajectory.detach().cpu().numpy()[0, 0, :, 1], pred_trajectory.detach().cpu().numpy()[0, 0, :, 0], 'o-', label='pred0 - conf %.3f' % pred_cls.detach().cpu().numpy()[0, 0])
-            ax.plot(-pred_trajectory.detach().cpu().numpy()[0, 1, :, 1], pred_trajectory.detach().cpu().numpy()[0, 1, :, 0], 'o-', label='pred1 - conf %.3f' % pred_cls.detach().cpu().numpy()[0, 1])
-            ax.plot(-pred_trajectory.detach().cpu().numpy()[0, 2, :, 1], pred_trajectory.detach().cpu().numpy()[0, 2, :, 0], 'o-', label='pred2 - conf %.3f' % pred_cls.detach().cpu().numpy()[0, 2])
-            ax.plot(-gt.detach().cpu().numpy()[0, :, 1], gt.detach().cpu().numpy()[0, :, 0], 'o-', label='gt')
-            plt.legend()
-            plt.show()
-
 
         gt_cls = index
         pred_trajectory = pred_trajectory[torch.tensor(range(len(gt_cls)), device=gt_cls.device), index, ...]  # B, num_pts, 3
 
-        if isinstance(self.cls_loss, nn.CrossEntropyLoss):
-            cls_loss = self.cls_loss(pred_cls, gt_cls)
-        elif isinstance(self.cls_loss, nn.MSELoss):
-            gt_cls_target = torch.zeros_like(pred_cls)
-            gt_cls_target[torch.tensor(range(len(gt_cls)), device=gt_cls.device), index] = 1
-            cls_loss = self.cls_loss(torch.sigmoid(pred_cls), gt_cls_target)
-        else:
-            raise NotImplementedError()
+        cls_loss = self.cls_loss(pred_cls, gt_cls)
 
         reg_loss = self.reg_loss(pred_trajectory, gt).mean(dim=(0, 1))
 

@@ -8,6 +8,7 @@ from torch.utils.data import DataLoader
 from argparse import ArgumentParser
 from data import PlanningDataset
 from model import PlaningNetwork, MultipleTrajectoryPredictionLoss
+from utils import draw_trajectory_on_ax
 import pytorch_lightning as pl
 import matplotlib.pyplot as plt
 from pytorch_lightning.callbacks import LearningRateMonitor
@@ -48,16 +49,14 @@ class PlanningBaselineV0(pl.LightningModule):
         self.log('loss/reg_z', reg_loss[2])
 
         if batch_idx % 10 == 0:
-            pred_trajectory = pred_trajectory.detach().cpu().numpy().reshape(-1, self.M, self.num_pts, 3)
-            pred_cls = pred_cls.detach().cpu().numpy()
+            trajectories = list(pred_trajectory[0].detach().cpu().numpy().reshape(-1, self.M, self.num_pts, 3))  # M, num_pts, 3
+            trajectories.append(labels[0].detach().cpu().numpy())
+            confs = list(F.softmax(pred_cls[0].detach().cpu(), dim=-1).numpy()) + [1, ] # M,
+
             fig, ax = plt.subplots()
-            ax.plot(-pred_trajectory[0, 0, :, 1], pred_trajectory[0, 0, :, 0], 'o-', label='pred0 - conf %.3f' % pred_cls[0, 0])
-            ax.plot(-pred_trajectory[0, 1, :, 1], pred_trajectory[0, 1, :, 0], 'o-', label='pred1 - conf %.3f' % pred_cls[0, 1])
-            ax.plot(-pred_trajectory[0, 2, :, 1], pred_trajectory[0, 2, :, 0], 'o-', label='pred2 - conf %.3f' % pred_cls[0, 2])
-            ax.plot(-labels.detach().cpu().numpy()[0, :, 1], labels.detach().cpu().numpy()[0, :, 0], 'o-', label='gt')
-            plt.legend()
+            ax = draw_trajectory_on_ax(ax, trajectories, confs)
             plt.tight_layout()
-            self.logger.experiment.add_figure('test', plt.gcf(), self.global_step)
+            self.logger.experiment.add_figure('train_vis', fig, self.global_step)
             plt.close(fig)
 
         return cls_loss + self.mtp_alpha * reg_loss.mean()
