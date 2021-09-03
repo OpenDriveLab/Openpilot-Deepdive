@@ -52,6 +52,8 @@ def get_val_metric(pred_cls, pred_trajectory, labels, namespace='val'):
         if points_mask.sum() == 0:
             continue  # No gt points in this range
         rtn_dict.update({'eucliden_%d_%d' % (min_dst, max_dst): euclidean_distances[points_mask]})  # [sum(mask), ]
+        rtn_dict.update({'eucliden_x_%d_%d' % (min_dst, max_dst): l2_dists[..., 0][points_mask].sqrt()})  # [sum(mask), ]
+        rtn_dict.update({'eucliden_y_%d_%d' % (min_dst, max_dst): l2_dists[..., 1][points_mask].sqrt()})  # [sum(mask), ]
 
         for AP_threshold in AP_thresholds:
             hit_mask = (euclidean_distances < AP_threshold) & points_mask
