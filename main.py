@@ -91,8 +91,9 @@ if __name__ == "__main__":
     
     args = parser.parse_args()
 
-    train = PlanningDataset(split='train')
-    val = PlanningDataset(split='val')
+    data_p = {10: 'p3_10pts_%s.json', 20: 'p3_%s.json'}[args.num_pts]
+    train = PlanningDataset(split='train', json_path_pattern=data_p)
+    val = PlanningDataset(split='val', json_path_pattern=data_p)
     train_loader = DataLoader(train, args.batch_size, shuffle=True, num_workers=args.n_workers)
     val_loader = DataLoader(val, args.batch_size, num_workers=args.n_workers)
 
