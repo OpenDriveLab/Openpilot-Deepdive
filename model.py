@@ -11,17 +11,36 @@ class PlaningNetwork(nn.Module):
         self.M = M
         self.num_pts = num_pts
         self.backbone = EfficientNet.from_pretrained('efficientnet-b2', in_channels=6)
-        self.plan_head = nn.Sequential(
-            nn.AdaptiveAvgPool2d(1),
-            nn.Flatten(),
-            nn.BatchNorm1d(1408),
-            nn.ReLU(),
-            nn.Linear(1408, 4096),
-            nn.BatchNorm1d(4096),
-            nn.ReLU(),
-            # nn.Dropout(0.3),
-            nn.Linear(4096, M * (num_pts * 3 + 1))  # +1 for cls
-        )
+
+        use_avg_pooling = False  # TODO
+        if use_avg_pooling:
+            self.plan_head = nn.Sequential(
+                nn.AdaptiveAvgPool2d(1),
+                nn.Flatten(),
+                nn.BatchNorm1d(1408),
+                nn.ReLU(),
+                nn.Linear(1408, 4096),
+                nn.BatchNorm1d(4096),
+                nn.ReLU(),
+                # nn.Dropout(0.3),
+                nn.Linear(4096, M * (num_pts * 3 + 1))  # +1 for cls
+            )
+        else:  # more like the structure of OpenPilot
+            self.plan_head = nn.Sequential(
+                # 6, 450, 800 -> 1408, 14, 25
+                nn.AdaptiveMaxPool2d((4, 8)),  # 1408, 4, 8
+                nn.BatchNorm2d(1408),
+                nn.Conv2d(1408, 32, 1),  # 32, 4, 8
+                nn.Flatten(),
+                nn.BatchNorm1d(1024),
+                nn.ReLU(),
+                nn.Linear(1024, 4096),
+                nn.BatchNorm1d(4096),
+                nn.ReLU(),
+                # nn.Dropout(0.3),
+                nn.Linear(4096, M * (num_pts * 3 + 1))  # +1 for cls
+            )
+
 
     def forward(self, x):
         features = self.backbone.extract_features(x)
