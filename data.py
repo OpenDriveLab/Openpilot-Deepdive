@@ -2,10 +2,12 @@ import os
 import json
 import torch
 import numpy as np
+import cv2
 
 from PIL import Image
 from torch.utils.data import Dataset
 from torchvision import transforms
+from utils import warp, generate_random_params_for_warp
 
 
 class PlanningDataset(Dataset):
@@ -13,6 +15,7 @@ class PlanningDataset(Dataset):
         self.samples = json.load(open(os.path.join(root, json_path_pattern % split)))
         print('PlanningDataset: %d samples loaded from %s' % 
               (len(self.samples), os.path.join(root, json_path_pattern % split)))
+        self.split = split
 
         self.img_root = os.path.join(root, 'nuscenes')
         self.transforms = transforms.Compose(
@@ -25,6 +28,8 @@ class PlanningDataset(Dataset):
             ]
         )
 
+        self.enable_aug = True
+
     def __len__(self):
         return len(self.samples)
 
@@ -32,13 +37,33 @@ class PlanningDataset(Dataset):
         sample = self.samples[idx]
         imgs, future_poses = sample['imgs'], sample['future_poses']
 
-        imgs = list(Image.open(os.path.join(self.img_root, p)) for p in imgs)
-        imgs = list(self.transforms(img) for img in imgs)
-        input_img = torch.cat(imgs, dim=0)
-        
         # process future_poses
         future_poses = torch.tensor(future_poses)
         future_poses[:, 0] = future_poses[:, 0].clamp(1e-2, )  # the car will never go backward
+
+        # process images
+        if self.enable_aug and self.split == 'train':
+            # data augumentation
+            imgs = list(cv2.imread(os.path.join(self.img_root, p)) for p in imgs)
+            imgs = list(cv2.cvtColor(img, cv2.COLOR_BGR2RGB) for img in imgs)  # RGB
+
+            # random distort (warp)
+            w_offsets, h_offsets = generate_random_params_for_warp(imgs[0], random_rate=0.1)
+            imgs = list(warp(img, w_offsets, h_offsets) for img in imgs)
+
+            # random flip
+            if np.random.rand() > 0.5:
+                imgs = list(img[:, ::-1, :] for img in imgs)
+                future_poses[:, 1] *= -1
+            
+            # cvt back to PIL images
+            imgs = list(Image.fromarray(img) for img in imgs)
+
+        else:
+            # no augumentation when testing
+            imgs = list(Image.open(os.path.join(self.img_root, p)) for p in imgs)
+        imgs = list(self.transforms(img) for img in imgs)
+        input_img = torch.cat(imgs, dim=0)
 
         return dict(
             input_img=input_img,

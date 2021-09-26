@@ -1,3 +1,4 @@
+import cv2
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.axes import Axes
@@ -64,3 +65,44 @@ def get_val_metric(pred_cls, pred_trajectory, labels, namespace='val'):
         for k in list(rtn_dict.keys()):
             rtn_dict['%s/%s' % (namespace, k)] = rtn_dict.pop(k)
     return rtn_dict
+
+
+def generate_random_params_for_warp(img, random_rate=0.1):
+    h, w = img.shape[:2]
+
+    width_max = random_rate * w
+    height_max = random_rate * h
+
+    # 8 offsets
+    w_offsets = list(np.random.uniform(0, width_max) for _ in range(4))
+    h_offsets = list(np.random.uniform(0, height_max) for _ in range(4))
+
+    return w_offsets, h_offsets
+
+
+def warp(img, w_offsets, h_offsets):
+    h, w = img.shape[:2]
+
+    original_corner_pts = np.array(
+        (
+            (w_offsets[0], h_offsets[0]),
+            (w - w_offsets[1], h_offsets[1]),
+            (w_offsets[2], h - h_offsets[2]),
+            (w - w_offsets[3], h - h_offsets[3]),
+        ), dtype=np.float32
+    )
+
+    target_corner_pts = np.array(
+        (
+            (0, 0),  # Top-left
+            (w, 0),  # Top-right
+            (0, h),  # Bottom-left
+            (w, h),  # Bottom-right
+        ), dtype=np.float32
+    )
+
+    transform_matrix = cv2.getPerspectiveTransform(original_corner_pts, target_corner_pts)
+
+    transformed_image = cv2.warpPerspective(img, transform_matrix, (w, h))
+
+    return transformed_image
