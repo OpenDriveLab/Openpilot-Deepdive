@@ -31,9 +31,9 @@ class PlaningNetwork(nn.Module):
                 nn.AdaptiveMaxPool2d((4, 8)),  # 1408, 4, 8
                 nn.BatchNorm2d(1408),
                 nn.Conv2d(1408, 32, 1),  # 32, 4, 8
+                nn.BatchNorm2d(32),
                 nn.Flatten(),
-                nn.BatchNorm1d(1024),
-                nn.ReLU(),
+                nn.ELU(),
                 nn.Linear(1024, 4096),
                 nn.BatchNorm1d(4096),
                 nn.ReLU(),
