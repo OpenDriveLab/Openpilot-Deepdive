@@ -10,11 +10,11 @@ import pytorch_lightning as pl
 
 
 
-val = PlanningDataset(split='val')
+val = PlanningDataset(split='val', json_path_pattern='p3_10pts_%s.json')
 val_loader = DataLoader(val, 16, num_workers=4, shuffle=False)
 
-planning_v0 = PlanningBaselineV0.load_from_checkpoint('epoch=910-step=92921.ckpt', M=3, num_pts=20, mtp_alpha=1.0, lr=0)
+planning_v0 = PlanningBaselineV0.load_from_checkpoint('epoch=999-step=154999.ckpt', M=3, num_pts=10, mtp_alpha=1.0, lr=0)
 
 trainer = pl.Trainer(gpus=1)
 
-trainer.validate(planning_v0, val_loader, 'epoch=910-step=92921.ckpt')
+trainer.validate(planning_v0, val_loader, 'epoch=999-step=154999.ckpt')
