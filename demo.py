@@ -9,10 +9,10 @@ from torch.utils.data import DataLoader
 
 import matplotlib.pyplot as plt
 
-val = PlanningDataset(split='val')
+val = PlanningDataset(split='val', json_path_pattern='p3_10pts_%s.json')
 val_loader = DataLoader(val, 1, num_workers=0, shuffle=False)
 
-planning_v0 = PlanningBaselineV0.load_from_checkpoint('epoch=910-step=92921.ckpt', M=3, num_pts=20, mtp_alpha=1.0, lr=0)
+planning_v0 = PlanningBaselineV0.load_from_checkpoint('epoch=999-step=154999.ckpt', M=3, num_pts=10, mtp_alpha=1.0, lr=0)
 planning_v0.eval().cuda()
 
 for b_idx, batch in enumerate(val_loader):
@@ -24,7 +24,7 @@ for b_idx, batch in enumerate(val_loader):
     with torch.no_grad():
         pred_cls, pred_trajectory = planning_v0(inputs.cuda())
         pred_conf = softmax(pred_cls, dim=-1).cpu().numpy()[0]
-        pred_trajectory = pred_trajectory.reshape(3, 20, 3).cpu().numpy()
+        pred_trajectory = pred_trajectory.reshape(3, 10, 3).cpu().numpy()
 
     vis_img = (inputs.permute(0, 2, 3, 1)[0] + torch.tensor((0.3890, 0.3937, 0.3851, 0.3890, 0.3937, 0.3851)) ) * torch.tensor((0.2172, 0.2141, 0.2209, 0.2172, 0.2141, 0.2209)) * 255
     vis_img = vis_img.clamp(0, 255)
@@ -56,5 +56,5 @@ for b_idx, batch in enumerate(val_loader):
 
     ax4.legend()
     plt.tight_layout()
-    plt.savefig('vis_yet_another_new/%04d.png' % b_idx)
+    plt.savefig('vis_sinh_10pts/%04d.png' % b_idx)
     plt.close(fig)
