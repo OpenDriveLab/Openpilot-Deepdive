@@ -45,8 +45,8 @@ intrinsic_matrices = []
 
 virtual_in_mat = np.array(
     [
-        [1266.4, 0, 800],
-        [0, 1266.4, 450],
+        [910.0, 0, 800],  # 1266.4 for nuScenes average
+        [0, 910.0, 450],  # 910.0 for CommaAI
         [0, 0, 1]
     ],
     dtype=np.float32
@@ -74,15 +74,6 @@ for idx, sample in enumerate(tqdm(val_loader)):
     in_matrix = sample['camera_intrinsic'][0].numpy().astype(np.float32)
     ex_matrix = sample['camera_extrinsic'][0].numpy().astype(np.float32)
 
-    # in_flag = False
-    # for m in extrinsic_matrices:
-    #     if np.allclose(ex_matrix, m):
-    #         in_flag = True
-    #         continue
-    # if in_flag:
-    #     continue
-    # extrinsic_matrices.append(ex_matrix)
-
     img_h, img_w = img_0.shape[:2]
 
     t2 = time.time()
@@ -93,19 +84,12 @@ for idx, sample in enumerate(tqdm(val_loader)):
     map_matrix[..., 0] = map_matrix[..., 0].clip(0, img_h-1)
     map_matrix[..., 1] = map_matrix[..., 1].clip(0, img_w-1)
 
-    canvas = np.zeros_like(img_1)
-
-    # for h in range(img_h):
-    #     for w in range(img_w):
-    #         canvas[h, w, :] = img_1[map_matrix[h, w, 0], map_matrix[h, w, 1], :]
-
     grid_indexes = map_matrix.reshape(-1, 2)
     grid_result = img_1[grid_indexes[:, 0], grid_indexes[:, 1]]  # img_h * img_w, 3
     grid_result = grid_result.reshape((img_h, img_w, 3))
     t4 = time.time()
 
-    # cv2.imshow('vis_rect/original_%d.png' % idx, img_1[..., ::-1])
-    # cv2.imshow('vis_rect/canvas_%d.png' % idx, canvas[..., ::-1])
-    # cv2.imshow('vis_rect/grid_result_%d.png' % idx, grid_result[..., ::-1])
-    # cv2.waitKey(0)
+    cv2.imshow('vis_rect/original_%d.png' % idx, img_1[..., ::-1])
+    cv2.imshow('vis_rect/grid_result_%d.png' % idx, grid_result[..., ::-1])
+    cv2.waitKey(0)
     print(t2 - t1, t3 - t2, t4 - t3)
