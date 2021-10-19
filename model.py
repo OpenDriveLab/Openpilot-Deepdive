@@ -54,6 +54,26 @@ class PlaningNetwork(nn.Module):
         return pred_cls, torch.cat((pred_xs, pred_ys, pred_zs), dim=3)
 
 
+class AbsoluteRelativeErrorLoss(nn.Module):
+    def __init__(self, epsilon=1e-4):
+        super().__init__()
+        self.epsilon = epsilon
+    
+    def forward(self, pred, target):
+        error = (pred - target) / (target + self.epsilon)
+        return torch.abs(error)
+
+
+class SigmoidAbsoluteRelativeErrorLoss(nn.Module):
+    def __init__(self, epsilon=1e-4):
+        super().__init__()
+        self.epsilon = epsilon
+    
+    def forward(self, pred, target):
+        error = (pred - target) / (target + self.epsilon)
+        return torch.sigmoid(torch.abs(error))
+
+
 class MultipleTrajectoryPredictionLoss(nn.Module):
     def __init__(self, alpha, M, num_pts, distance_type='angle'):
         super().__init__()
@@ -67,7 +87,9 @@ class MultipleTrajectoryPredictionLoss(nn.Module):
         else:
             raise NotImplementedError
         self.cls_loss = nn.CrossEntropyLoss()
-        self.reg_loss = nn.SmoothL1Loss(reduction='none')
+        # self.reg_loss = nn.SmoothL1Loss(reduction='none')
+        # self.reg_loss = SigmoidAbsoluteRelativeErrorLoss()
+        self.reg_loss = AbsoluteRelativeErrorLoss()
 
     def forward(self, pred_cls, pred_trajectory, gt):
         """
