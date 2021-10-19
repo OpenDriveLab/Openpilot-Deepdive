@@ -28,7 +28,7 @@ class PlaningNetwork(nn.Module):
         else:  # more like the structure of OpenPilot
             self.plan_head = nn.Sequential(
                 # 6, 450, 800 -> 1408, 14, 25
-                nn.AdaptiveMaxPool2d((4, 8)),  # 1408, 4, 8
+                # nn.AdaptiveMaxPool2d((4, 8)),  # 1408, 4, 8
                 nn.BatchNorm2d(1408),
                 nn.Conv2d(1408, 32, 1),  # 32, 4, 8
                 nn.BatchNorm2d(32),
@@ -87,9 +87,9 @@ class MultipleTrajectoryPredictionLoss(nn.Module):
         else:
             raise NotImplementedError
         self.cls_loss = nn.CrossEntropyLoss()
-        # self.reg_loss = nn.SmoothL1Loss(reduction='none')
+        self.reg_loss = nn.SmoothL1Loss(reduction='none')
         # self.reg_loss = SigmoidAbsoluteRelativeErrorLoss()
-        self.reg_loss = AbsoluteRelativeErrorLoss()
+        # self.reg_loss = AbsoluteRelativeErrorLoss()
 
     def forward(self, pred_cls, pred_trajectory, gt):
         """

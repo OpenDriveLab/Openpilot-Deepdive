@@ -5,16 +5,15 @@ import numpy as np
 import cv2
 from PIL import Image
 from torch.utils.data import Dataset
-from data import PlanningDataset
 # from torchvision import transforms
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 
 
 device_frame_from_view_frame = np.array([
-  [ 0.,  0.,  1.],
-  [ 1.,  0.,  0.],
-  [ 0.,  1.,  0.]
+    [ 0.,  0.,  1.],
+    [ 1.,  0.,  0.],
+    [ 0.,  1.,  0.]
 ])
 view_frame_from_device_frame = device_frame_from_view_frame.T
 
@@ -25,13 +24,9 @@ MEDMODEL_CY = 47.6
 
 medmodel_fl = 910.0
 medmodel_intrinsics = np.array([
-  [medmodel_fl,  0.0,  0.5 * MEDMODEL_INPUT_SIZE[0]],
-  [0.0,  medmodel_fl,                   MEDMODEL_CY],
-  [0.0,  0.0,                                   1.0]])
-
-
-
-
+    [medmodel_fl,  0.0,  0.5 * MEDMODEL_INPUT_SIZE[0]],
+    [0.0,  medmodel_fl,                   MEDMODEL_CY],
+    [0.0,  0.0,                                   1.0]])
 
 
 def calibration(extrinsic_matrix, cam_intrinsics):
@@ -51,6 +46,7 @@ def calibration(extrinsic_matrix, cam_intrinsics):
     return warp_matrix
 
 if __name__ == '__main__':
+    from data import PlanningDataset
     dataset = PlanningDataset(split='val')
     for idx, data in tqdm(enumerate(dataset)):
         imgs = data["input_img"]

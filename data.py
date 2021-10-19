@@ -8,6 +8,7 @@ from PIL import Image
 from torch.utils.data import Dataset
 from torchvision import transforms
 from utils import warp, generate_random_params_for_warp
+from preprocess_view_transform import calibration
 
 
 class PlanningDataset(Dataset):
@@ -20,7 +21,7 @@ class PlanningDataset(Dataset):
         self.img_root = os.path.join(root, 'nuscenes')
         self.transforms = transforms.Compose(
             [
-                transforms.Resize((900 // 2, 1600 // 2)),
+                # transforms.Resize((900 // 2, 1600 // 2)),
                 # transforms.Resize((9 * 32, 16 * 32)),
                 transforms.ToTensor(),
                 transforms.Normalize([0.3890, 0.3937, 0.3851],
@@ -28,7 +29,8 @@ class PlanningDataset(Dataset):
             ]
         )
 
-        self.enable_aug = True
+        self.enable_aug = False
+        self.view_transform = True
 
     def __len__(self):
         return len(self.samples)
@@ -41,12 +43,12 @@ class PlanningDataset(Dataset):
         future_poses = torch.tensor(future_poses)
         future_poses[:, 0] = future_poses[:, 0].clamp(1e-2, )  # the car will never go backward
 
+        imgs = list(cv2.imread(os.path.join(self.img_root, p)) for p in imgs)
+        imgs = list(cv2.cvtColor(img, cv2.COLOR_BGR2RGB) for img in imgs)  # RGB
+
         # process images
         if self.enable_aug and self.split == 'train':
-            # data augumentation
-            imgs = list(cv2.imread(os.path.join(self.img_root, p)) for p in imgs)
-            imgs = list(cv2.cvtColor(img, cv2.COLOR_BGR2RGB) for img in imgs)  # RGB
-
+            # data augumentation when training
             # random distort (warp)
             w_offsets, h_offsets = generate_random_params_for_warp(imgs[0], random_rate=0.1)
             imgs = list(warp(img, w_offsets, h_offsets) for img in imgs)
@@ -56,12 +58,20 @@ class PlanningDataset(Dataset):
                 imgs = list(img[:, ::-1, :] for img in imgs)
                 future_poses[:, 1] *= -1
             
-            # cvt back to PIL images
-            imgs = list(Image.fromarray(img) for img in imgs)
 
-        else:
-            # no augumentation when testing
-            imgs = list(Image.open(os.path.join(self.img_root, p)) for p in imgs)
+        if self.view_transform:
+            camera_rotation_matrix = np.linalg.inv(np.array(sample["camera_rotation_matrix_inv"]))
+            camera_translation = -np.array(sample["camera_translation_inv"])
+            camera_extrinsic = np.vstack((np.hstack((camera_rotation_matrix, camera_translation.reshape((3, 1)))), np.array([0, 0, 0, 1])))
+            camera_extrinsic = np.linalg.inv(camera_extrinsic)
+            warp_matrix = calibration(camera_extrinsic, np.array(sample["camera_intrinsic"]))
+            imgs = list(cv2.warpPerspective(src = img, M = warp_matrix, dsize= (256,128), flags= cv2.WARP_INVERSE_MAP) for img in imgs)
+
+        # cvt back to PIL images
+        # cv2.imshow('0', imgs[0])
+        # cv2.imshow('1', imgs[1])
+        # cv2.waitKey(0)
+        imgs = list(Image.fromarray(img) for img in imgs)
         imgs = list(self.transforms(img) for img in imgs)
         input_img = torch.cat(imgs, dim=0)
 

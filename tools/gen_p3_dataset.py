@@ -16,8 +16,10 @@ DATA_ROOT = 'data/nuscenes'
 SPLIT = 'v1.0-trainval'
 NUM_RGB_IMGS = 2
 NUM_FUTURE_TRAJECTORY_PTS = 10
-OUTPUT_JSON_NAME = 'data/p3_10pts_can_bus_%s.json'
+OUTPUT_JSON_NAME = 'data/p3_10pts_can_bus_%s_temporal.json'
 GET_CAN_BUS = True
+
+TEMPORAL = True
 
 
 sensors_tree = {
@@ -108,7 +110,8 @@ def get_samples(nusc, scenes, nusc_can=None):
     for scene in tqdm(scenes, ncols=0):
         assert len(scene) >= NUM_RGB_IMGS + NUM_FUTURE_TRAJECTORY_PTS
         valid_start_tokens = scene[NUM_RGB_IMGS-1 : -NUM_FUTURE_TRAJECTORY_PTS]
-
+        if TEMPORAL:
+            cur_scene_samples = []
         # CAN BUS
         if nusc_can is not None:
             can_bus_cache = dict()
@@ -187,8 +190,13 @@ def get_samples(nusc, scenes, nusc_can=None):
                         if isinstance(can_bus_value, np.ndarray):
                             can_bus_value = can_bus_value.tolist()
                         cur_sample_to_append['can_bus.%s.%s' % (message_name, key_name)] = can_bus_value
-            samples.append(cur_sample_to_append)
+            if TEMPORAL:
+                cur_scene_samples.append(cur_sample_to_append)
+            else:
+                samples.append(cur_sample_to_append)
 
+        if TEMPORAL:
+            samples.append(cur_scene_samples)
 
     return samples
 
