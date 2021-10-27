@@ -3,6 +3,8 @@ import json
 import torch
 import numpy as np
 import cv2
+cv2.setNumThreads(0)
+cv2.ocl.setUseOpenCL(False)
 
 from PIL import Image
 from torch.utils.data import Dataset
@@ -23,6 +25,7 @@ class PlanningDataset(Dataset):
             [
                 # transforms.Resize((900 // 2, 1600 // 2)),
                 # transforms.Resize((9 * 32, 16 * 32)),
+                transforms.Resize((128, 256)),
                 transforms.ToTensor(),
                 transforms.Normalize([0.3890, 0.3937, 0.3851],
                                      [0.2172, 0.2141, 0.2209]),
@@ -30,7 +33,26 @@ class PlanningDataset(Dataset):
         )
 
         self.enable_aug = False
-        self.view_transform = True
+        self.view_transform = False
+
+        self.use_memcache = True
+        if self.use_memcache:
+            self._init_mc_()
+
+    def _init_mc_(self):
+        from petrel_client.client import Client
+        self.client = Client('~/petreloss.conf')
+
+    def _get_cv2_image(self, path):
+        if self.use_memcache:
+            img_bytes = self.client.get(str(path))
+            assert(img_bytes is not None)
+            img_mem_view = memoryview(img_bytes)
+            img_array = np.frombuffer(img_mem_view, np.uint8)
+            return cv2.imdecode(img_array, cv2.IMREAD_COLOR)
+
+        else:
+            return cv2.imread(path)
 
     def __len__(self):
         return len(self.samples)
@@ -43,7 +65,7 @@ class PlanningDataset(Dataset):
         future_poses = torch.tensor(future_poses)
         future_poses[:, 0] = future_poses[:, 0].clamp(1e-2, )  # the car will never go backward
 
-        imgs = list(cv2.imread(os.path.join(self.img_root, p)) for p in imgs)
+        imgs = list(self._get_cv2_image(os.path.join(self.img_root, p)) for p in imgs)
         imgs = list(cv2.cvtColor(img, cv2.COLOR_BGR2RGB) for img in imgs)  # RGB
 
         # process images
