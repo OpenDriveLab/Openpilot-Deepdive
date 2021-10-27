@@ -3,3 +3,4 @@ lightning_logs/
 __pycache__
 vis*/
 *.ckpt
+.vscode

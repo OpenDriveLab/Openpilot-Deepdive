@@ -54,6 +54,50 @@ class PlaningNetwork(nn.Module):
         return pred_cls, torch.cat((pred_xs, pred_ys, pred_zs), dim=3)
 
 
+class SequencePlanningNetwork(nn.Module):
+    def __init__(self, M, num_pts):
+        super().__init__()
+        self.M = M
+        self.num_pts = num_pts
+        self.backbone = EfficientNet.from_pretrained('efficientnet-b2', in_channels=6)
+
+        self.plan_head = nn.Sequential(
+            # 6, 450, 800 -> 1408, 14, 25
+            # nn.AdaptiveMaxPool2d((4, 8)),  # 1408, 4, 8
+            nn.BatchNorm2d(1408),
+            nn.Conv2d(1408, 32, 1),  # 32, 4, 8
+            nn.BatchNorm2d(32),
+            nn.Flatten(),
+            nn.ELU(),
+        )
+        self.gru = nn.GRU(input_size=1024, hidden_size=512, bidirectional=True, batch_first=True)  # 1024 out
+        self.plan_head_tip = nn.Sequential(
+            nn.Flatten(),
+            # nn.BatchNorm1d(1024),
+            nn.ELU(),
+            nn.Linear(1024, 4096),
+            # nn.BatchNorm1d(4096),
+            nn.ReLU(),
+            # nn.Dropout(0.3),
+            nn.Linear(4096, M * (num_pts * 3 + 1))  # +1 for cls
+        )
+
+    def forward(self, x, hidden):
+        features = self.backbone.extract_features(x)
+
+        raw_preds = self.plan_head(features)
+        raw_preds, hidden = self.gru(raw_preds[:, None, :], hidden)  # N, L, H_in for batch_first=True
+        raw_preds = self.plan_head_tip(raw_preds)
+
+        pred_cls = raw_preds[:, :self.M]
+        pred_trajectory = raw_preds[:, self.M:].reshape(-1, self.M, self.num_pts, 3)
+
+        pred_xs = pred_trajectory[:, :, :, 0:1].exp()
+        pred_ys = pred_trajectory[:, :, :, 1:2].sinh()
+        pred_zs = pred_trajectory[:, :, :, 2:3]
+        return pred_cls, torch.cat((pred_xs, pred_ys, pred_zs), dim=3), hidden
+
+
 class AbsoluteRelativeErrorLoss(nn.Module):
     def __init__(self, epsilon=1e-4):
         super().__init__()

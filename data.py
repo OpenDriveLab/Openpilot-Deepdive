@@ -35,7 +35,7 @@ class PlanningDataset(Dataset):
         self.enable_aug = False
         self.view_transform = False
 
-        self.use_memcache = True
+        self.use_memcache = False
         if self.use_memcache:
             self._init_mc_()
 
@@ -107,9 +107,53 @@ class PlanningDataset(Dataset):
         )
 
 
+class SequencePlanningDataset(PlanningDataset):
+    def __init__(self, root='data', json_path_pattern='p3_%s.json', split='train'):
+        print('Sequence', end='')
+        self.fix_seq_length = 28
+        super().__init__(root=root, json_path_pattern=json_path_pattern, split=split)
+
+    def __getitem__(self, idx):
+        seq_samples = self.samples[idx]
+        seq_length = len(seq_samples)
+        assert seq_length >= self.fix_seq_length
+        if seq_length > self.fix_seq_length:
+            seq_length_delta = seq_length - self.fix_seq_length
+            seq_length_delta = np.random.randint(0, seq_length_delta+1)
+            seq_samples = seq_samples[seq_length_delta:self.fix_seq_length+seq_length_delta]
+
+        seq_future_poses = list(smp['future_poses'] for smp in seq_samples)
+        seq_imgs = list(smp['imgs'] for smp in seq_samples)
+
+        seq_input_img = []
+        for imgs in seq_imgs:
+            imgs = list(self._get_cv2_image(os.path.join(self.img_root, p)) for p in imgs)
+            imgs = list(cv2.cvtColor(img, cv2.COLOR_BGR2RGB) for img in imgs)  # RGB
+            imgs = list(Image.fromarray(img) for img in imgs)
+            imgs = list(self.transforms(img) for img in imgs)
+            input_img = torch.cat(imgs, dim=0)
+            seq_input_img.append(input_img[None])
+        seq_input_img = torch.cat(seq_input_img)
+
+        return dict(
+            seq_input_img=seq_input_img,  # torch.Size([28, 10, 3])
+            seq_future_poses=torch.tensor(seq_future_poses),  # torch.Size([28, 6, 128, 256])
+            camera_intrinsic=torch.tensor(seq_samples[0]['camera_intrinsic']),
+            camera_extrinsic=torch.tensor(seq_samples[0]['camera_extrinsic']),
+            camera_translation_inv=torch.tensor(seq_samples[0]['camera_translation_inv']),
+            camera_rotation_matrix_inv=torch.tensor(seq_samples[0]['camera_rotation_matrix_inv']),
+        )
+
+
 if __name__ == '__main__':
     from torch.utils.data import DataLoader
     from tqdm import tqdm
+
+    dataset = SequencePlanningDataset(split='val', json_path_pattern='p3_10pts_can_bus_%s_temporal.json')
+    for sample in dataset:
+        print(sample[0].shape, sample[1].shape)
+
+    exit()
 
     dataset = PlanningDataset(split='val')
 
