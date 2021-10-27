@@ -63,9 +63,9 @@ class PlanningBaselineV0(pl.LightningModule):
         return cls_loss + self.mtp_alpha * reg_loss.mean()
 
     def configure_optimizers(self):
-        optimizer = optim.Adam(self.parameters(), lr=self.lr, weight_decay=0.01)
+        optimizer = optim.SGD(self.parameters(), lr=self.lr, momentum=0.9, weight_decay=0.01)
+        # optimizer = optim.Adam(self.parameters(), lr=self.lr, weight_decay=0.01)
         lr_scheduler = optim.lr_scheduler.StepLR(optimizer, 20, 0.9)
-        # optimizer = optim.SGD(self.parameters(), lr=LR, momentum=0.9, weight_decay=0.01)
         return [optimizer], [lr_scheduler]
 
     def validation_step(self, batch, batch_idx):
@@ -82,7 +82,7 @@ if __name__ == "__main__":
 
     parser = ArgumentParser()
     
-    parser.add_argument('--batch_size', type=int, default=32)
+    parser.add_argument('--batch_size', type=int, default=32 * 4)
     parser.add_argument('--lr', type=float, default=1e-4)
     parser.add_argument('--n_workers', type=int, default=8)
 
@@ -94,19 +94,22 @@ if __name__ == "__main__":
     data_p = {10: 'p3_10pts_%s.json', 20: 'p3_%s.json'}[args.num_pts]
     train = PlanningDataset(split='train', json_path_pattern=data_p)
     val = PlanningDataset(split='val', json_path_pattern=data_p)
-    train_loader = DataLoader(train, args.batch_size, shuffle=True, num_workers=args.n_workers)
-    val_loader = DataLoader(val, args.batch_size, num_workers=args.n_workers)
+    train_loader = DataLoader(train, args.batch_size, shuffle=True, num_workers=args.n_workers, persistent_workers=True, prefetch_factor=4, pin_memory=True)
+    val_loader = DataLoader(val, args.batch_size, num_workers=args.n_workers, persistent_workers=True, prefetch_factor=4, pin_memory=True)
 
     planning_v0 = PlanningBaselineV0(args.M, args.num_pts, args.mtp_alpha, args.lr)
     lr_monitor = LearningRateMonitor(logging_interval='step')
 
     trainer = pl.Trainer.from_argparse_args(args,
-                                            accelerator='ddp',
+                                            accelerator='ddp' if args.gpus > 1 else None,
                                             profiler='simple',
                                             benchmark=True,
                                             log_every_n_steps=10,
                                             flush_logs_every_n_steps=50,
                                             callbacks=[lr_monitor],
+                                            check_val_every_n_epoch=10,  # val every 10 epoch to speed up train process
+                                            # val_check_interval=0.0,  # Disable in-batch val
+                                            progress_bar_refresh_rate=10,  # for slurm env
                                             )
 
     trainer.fit(planning_v0, train_loader, val_loader)
