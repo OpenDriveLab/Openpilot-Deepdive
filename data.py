@@ -35,13 +35,14 @@ class PlanningDataset(Dataset):
         self.enable_aug = False
         self.view_transform = False
 
-        self.use_memcache = False
+        self.use_memcache = True
         if self.use_memcache:
             self._init_mc_()
 
     def _init_mc_(self):
         from petrel_client.client import Client
         self.client = Client('~/petreloss.conf')
+        print('======== Initializing Memcache: Success =======')
 
     def _get_cv2_image(self, path):
         if self.use_memcache:
@@ -110,13 +111,15 @@ class PlanningDataset(Dataset):
 class SequencePlanningDataset(PlanningDataset):
     def __init__(self, root='data', json_path_pattern='p3_%s.json', split='train'):
         print('Sequence', end='')
-        self.fix_seq_length = 28
+        self.fix_seq_length = 18
         super().__init__(root=root, json_path_pattern=json_path_pattern, split=split)
 
     def __getitem__(self, idx):
         seq_samples = self.samples[idx]
         seq_length = len(seq_samples)
-        assert seq_length >= self.fix_seq_length
+        if seq_length < self.fix_seq_length:
+            # Only 1 sample < 28 (==21)
+            return self.__getitem__(np.random.randint(0, len(self.samples)))
         if seq_length > self.fix_seq_length:
             seq_length_delta = seq_length - self.fix_seq_length
             seq_length_delta = np.random.randint(0, seq_length_delta+1)

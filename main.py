@@ -79,12 +79,13 @@ class PlanningBaselineV0(pl.LightningModule):
 
 
 class SequencePlanningBaselineV0(pl.LightningModule):
-    def __init__(self, M, num_pts, mtp_alpha, lr) -> None:
+    def __init__(self, M, num_pts, mtp_alpha, lr, optimizer) -> None:
         super().__init__()
         self.M = M
         self.num_pts = num_pts
         self.mtp_alpha = mtp_alpha
         self.lr = lr
+        self.optimizer = optimizer
 
         self.net = SequencePlanningNetwork(M, num_pts)
         self.mtp_loss = MultipleTrajectoryPredictionLoss(mtp_alpha, M, num_pts, distance_type='angle')
@@ -95,11 +96,14 @@ class SequencePlanningBaselineV0(pl.LightningModule):
         parser.add_argument('--M', type=int, default=3)
         parser.add_argument('--num_pts', type=int, default=20)
         parser.add_argument('--mtp_alpha', type=float, default=1.0)
+        parser.add_argument('--optimizer', type=str, default='sgd')
         return parent_parser
 
-    def forward(self, x):
+    def forward(self, x, hidden=None):
+        if hidden is None:
+            hidden = torch.zeros((2, x.size(0), 512)).to(self.device)
         # in lightning, forward defines the prediction/inference actions
-        return self.net(x)
+        return self.net(x, hidden)
 
     def training_step(self, batch, batch_idx):
         # training_step defines the train loop. It is independent of forward
@@ -139,8 +143,12 @@ class SequencePlanningBaselineV0(pl.LightningModule):
         return cls_loss + self.mtp_alpha * reg_loss.mean()
 
     def configure_optimizers(self):
-        optimizer = optim.SGD(self.parameters(), lr=self.lr, momentum=0.9, weight_decay=0.01)
-        # optimizer = optim.Adam(self.parameters(), lr=self.lr, weight_decay=0.01)
+        if self.optimizer == 'sgd':
+            optimizer = optim.SGD(self.parameters(), lr=self.lr, momentum=0.9, weight_decay=0.01)
+        elif self.optimizer == 'adam':
+            optimizer = optim.Adam(self.parameters(), lr=self.lr, weight_decay=0.01)
+        else:
+            raise NotImplementedError
         lr_scheduler = optim.lr_scheduler.StepLR(optimizer, 20, 0.9)
         return [optimizer], [lr_scheduler]
 
@@ -179,7 +187,7 @@ if __name__ == "__main__":
     train_loader = DataLoader(train, args.batch_size, shuffle=True, num_workers=args.n_workers, persistent_workers=True, prefetch_factor=4, pin_memory=True)
     val_loader = DataLoader(val, args.batch_size, num_workers=args.n_workers, persistent_workers=True, prefetch_factor=4, pin_memory=True)
 
-    planning_v0 = SequencePlanningBaselineV0(args.M, args.num_pts, args.mtp_alpha, args.lr)
+    planning_v0 = SequencePlanningBaselineV0(args.M, args.num_pts, args.mtp_alpha, args.lr, args.optimizer)
     lr_monitor = LearningRateMonitor(logging_interval='step')
 
     trainer = pl.Trainer.from_argparse_args(args,
