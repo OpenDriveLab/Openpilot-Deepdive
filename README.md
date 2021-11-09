@@ -1,7 +1,7 @@
 Reimplementation of OpenPilot (P3 part)
 ---
 
-Still a long way to go.
+Just a short way to go.
 
 ## Folder structure
 
