@@ -7,5 +7,6 @@ Just a short way to go.
 
 ```
 ./data
-    nuscenes -> link to the nuscenes-all dataset
+    nuscenes  -> link to the nuscenes-all dataset
+    comma2k19 -> link to the Comma2k19 dataset
 ```
