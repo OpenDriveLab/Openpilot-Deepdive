@@ -7,13 +7,14 @@ from torch.utils.data import DataLoader
 
 from argparse import ArgumentParser
 
-from data import PlanningDataset, SequencePlanningDataset
+from data import PlanningDataset, SequencePlanningDataset, Comma2k19SequenceDataset
 from model import PlaningNetwork, MultipleTrajectoryPredictionLoss, SequencePlanningNetwork
 from utils import draw_trajectory_on_ax, get_val_metric
 import pytorch_lightning as pl
 import matplotlib.pyplot as plt
 from pytorch_lightning.callbacks import LearningRateMonitor
 
+from tqdm import tqdm
 
 class PlanningBaselineV0(pl.LightningModule):
     def __init__(self, M, num_pts, mtp_alpha, lr) -> None:
@@ -140,7 +141,7 @@ class SequencePlanningBaselineV0(pl.LightningModule):
         #     self.logger.experiment.add_figure('train_vis', fig, self.global_step)
         #     plt.close(fig)
 
-        return cls_loss + self.mtp_alpha * reg_loss.mean()
+        return cls_loss_total + self.mtp_alpha * reg_loss_total.mean()
 
     def configure_optimizers(self):
         if self.optimizer == 'sgd':
@@ -167,6 +168,47 @@ class SequencePlanningBaselineV0(pl.LightningModule):
             self.log_dict(metrics)
 
 
+class SequenceBaselineV1(SequencePlanningBaselineV0):
+    def __init__(self, M, num_pts, mtp_alpha, lr, optimizer) -> None:
+        super().__init__(M, num_pts, mtp_alpha, lr, optimizer)
+        self.automatic_optimization = False
+        self.optimize_per_n_step = 40
+
+    def training_step(self, batch, batch_idx):
+        # manual backward
+        opt = self.optimizers()
+
+        seq_inputs, seq_labels = batch['seq_input_img'], batch['seq_future_poses']
+        bs = seq_labels.size(0)
+        seq_length = seq_labels.size(1)
+        
+        hidden = torch.zeros((2, bs, 512)).to(self.device)
+        total_loss = 0
+        for t in tqdm(range(seq_length), leave=False):
+            inputs, labels = seq_inputs[:, t, :, :, :], seq_labels[:, t, :, :]
+            pred_cls, pred_trajectory, hidden = self.net(inputs, hidden)
+            cls_loss, reg_loss = self.mtp_loss(pred_cls, pred_trajectory, labels)
+            total_loss += (cls_loss + self.mtp_alpha * reg_loss.mean()) / self.optimize_per_n_step
+        
+            self.log('loss/cls', cls_loss)
+            self.log('loss/reg', reg_loss.mean())
+            self.log('loss/reg_x', reg_loss[0])
+            self.log('loss/reg_y', reg_loss[1])
+            self.log('loss/reg_z', reg_loss[2])
+
+            if (t + 1) % self.optimize_per_n_step == 0:
+                opt.zero_grad()
+                self.manual_backward(total_loss)
+                opt.step()
+                hidden = hidden.clone().detach()
+                total_loss = 0
+
+        if not isinstance(total_loss, int):
+            opt.zero_grad()
+            self.manual_backward(total_loss)
+            opt.step()
+
+
 if __name__ == "__main__":
 
     parser = ArgumentParser()
@@ -180,26 +222,28 @@ if __name__ == "__main__":
     
     args = parser.parse_args()
 
-    data_p = {10: 'p3_10pts_%s.json', 20: 'p3_%s.json'}[args.num_pts]
-    data_p = 'p3_10pts_can_bus_%s_temporal.json'
-    train = SequencePlanningDataset(split='train', json_path_pattern=data_p)
-    val = SequencePlanningDataset(split='val', json_path_pattern=data_p)
-    train_loader = DataLoader(train, args.batch_size, shuffle=True, num_workers=args.n_workers, persistent_workers=True, prefetch_factor=4, pin_memory=True)
-    val_loader = DataLoader(val, args.batch_size, num_workers=args.n_workers, persistent_workers=True, prefetch_factor=4, pin_memory=True)
+    # data_p = {10: 'p3_10pts_%s.json', 20: 'p3_%s.json'}[args.num_pts]
+    # data_p = 'p3_10pts_can_bus_%s_temporal.json'
+    # train = SequencePlanningDataset(split='train', json_path_pattern=data_p)
+    # val = SequencePlanningDataset(split='val', json_path_pattern=data_p)
+    train = Comma2k19SequenceDataset('data/comma2k19_val_non_overlap.txt', 'data/comma2k19/','train', use_memcache=False)
+    val = Comma2k19SequenceDataset('data/comma2k19_val_non_overlap.txt', 'data/comma2k19/','val', use_memcache=False)
+    train_loader = DataLoader(train, args.batch_size, shuffle=True, num_workers=args.n_workers, persistent_workers=True, prefetch_factor=2, pin_memory=True)
+    val_loader = DataLoader(val, args.batch_size, num_workers=args.n_workers, persistent_workers=True, prefetch_factor=2, pin_memory=True)
 
-    planning_v0 = SequencePlanningBaselineV0(args.M, args.num_pts, args.mtp_alpha, args.lr, args.optimizer)
+    planning_v0 = SequenceBaselineV1(args.M, args.num_pts, args.mtp_alpha, args.lr, args.optimizer)
     lr_monitor = LearningRateMonitor(logging_interval='step')
 
     trainer = pl.Trainer.from_argparse_args(args,
                                             accelerator='ddp' if args.gpus > 1 else None,
                                             profiler='simple',
                                             benchmark=True,
-                                            log_every_n_steps=10,
-                                            flush_logs_every_n_steps=50,
+                                            log_every_n_steps=1,
+                                            flush_logs_every_n_steps=10,
                                             callbacks=[lr_monitor],
                                             check_val_every_n_epoch=10,  # val every 10 epoch to speed up train process
                                             # val_check_interval=0.0,  # Disable in-batch val
-                                            progress_bar_refresh_rate=10,  # for slurm env
+                                            progress_bar_refresh_rate=1,  # for slurm env
                                             )
 
     trainer.fit(planning_v0, train_loader, val_loader)
