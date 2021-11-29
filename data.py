@@ -4,6 +4,7 @@ import json
 import torch
 from math import pi
 import numpy as np
+from scipy.interpolate import interp1d
 import cv2
 cv2.setNumThreads(0)
 cv2.ocl.setUseOpenCL(False)
@@ -154,15 +155,15 @@ class SequencePlanningDataset(PlanningDataset):
 
 
 class Comma2k19SequenceDataset(PlanningDataset):
-    def __init__(self, split_txt_path, prefix, num_pts=10, use_memcache=True):
+    def __init__(self, split_txt_path, prefix, mode, use_memcache=True):
         self.split_txt_path = split_txt_path
         self.prefix = prefix
 
         self.samples = open(split_txt_path).readlines()
         self.samples = [i.strip() for i in self.samples]
 
-        self.num_pts = num_pts
-        self.fix_seq_length = 40
+        assert mode in ('train', 'val')
+        self.fix_seq_length = 800 if mode == 'train' else 800
 
         self.transforms = transforms.Compose(
             [
@@ -178,6 +179,20 @@ class Comma2k19SequenceDataset(PlanningDataset):
         self.use_memcache = use_memcache
         if self.use_memcache:
             self._init_mc_()
+
+        # from OpenPilot
+        self.num_pts = 10 * 20  # 10 s * 20 Hz = 200 frames
+        self.t_anchors = np.array(
+            (0.        ,  0.00976562,  0.0390625 ,  0.08789062,  0.15625   ,
+             0.24414062,  0.3515625 ,  0.47851562,  0.625     ,  0.79101562,
+             0.9765625 ,  1.18164062,  1.40625   ,  1.65039062,  1.9140625 ,
+             2.19726562,  2.5       ,  2.82226562,  3.1640625 ,  3.52539062,
+             3.90625   ,  4.30664062,  4.7265625 ,  5.16601562,  5.625     ,
+             6.10351562,  6.6015625 ,  7.11914062,  7.65625   ,  8.21289062,
+             8.7890625 ,  9.38476562, 10.)
+        )
+        self.t_idx = np.linspace(0, 10, num=self.num_pts)
+
 
     def _get_cv2_vid(self, path):
         if self.use_memcache:
@@ -235,9 +250,14 @@ class Comma2k19SequenceDataset(PlanningDataset):
             ecef_from_local = orient.rot_from_quat(frame_orientations[i])
             local_from_ecef = ecef_from_local.T
             frame_positions_local = np.einsum('ij,kj->ki', local_from_ecef, frame_positions - frame_positions[i]).astype(np.float32)
+
+            # Time-Anchor like OpenPilot
+            fs = [interp1d(self.t_idx, frame_positions_local[i: i+self.num_pts, j]) for j in range(3)]
+            interp_positions = [fs[j](self.t_anchors)[:, None] for j in range(3)]
+            interp_positions = np.concatenate(interp_positions, axis=1)
             
-            future_poses.append(frame_positions_local[i: i+10])
-        future_poses = torch.tensor(future_poses)
+            future_poses.append(interp_positions)
+        future_poses = torch.tensor(future_poses, dtype=torch.float32)
 
         return dict(
             seq_input_img=input_img,  # torch.Size([N, 6, 128, 256])
@@ -255,12 +275,12 @@ if __name__ == '__main__':
     from utils import draw_trajectory_on_ax
     import matplotlib.pyplot as plt
 
-    dataset = Comma2k19SequenceDataset('data/comma2k19_val_non_overlap.txt', 'data/comma2k19/', use_memcache=False)
+    dataset = Comma2k19SequenceDataset('data/comma2k19_val_non_overlap.txt', 'data/comma2k19/', 'train', use_memcache=False)
     for sample in dataset:
         for k, v in sample.items():
             print(k, ':', v.shape, v.dtype)
         for img, traj in zip(sample['seq_input_img'], sample['seq_future_poses']):
-            trajectories = list(traj.numpy().reshape(1, 10, 3))  # M, num_pts, 3
+            trajectories = list(traj.numpy().reshape(1, 33, 3))  # M, num_pts, 3
             print(trajectories)
 
             fig, ax = plt.subplots()
