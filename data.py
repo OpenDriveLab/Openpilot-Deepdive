@@ -195,8 +195,10 @@ class Comma2k19SequenceDataset(PlanningDataset):
 
 
     def _get_cv2_vid(self, path):
+        print(path)
         if self.use_memcache:
-            path = self.client.get(str(path), client_method='get_object', expires_in=3600)
+            path = self.client.generate_presigned_url(str(path), client_method='get_object', expires_in=3600)
+            print(path)
         return cv2.VideoCapture(path)
 
     def _get_numpy(self, path):
@@ -216,16 +218,20 @@ class Comma2k19SequenceDataset(PlanningDataset):
             ret, frame = cap.read()
             if ret == True:
                 imgs.append(frame)
+                # cv2.imshow('frame', frame)
+                # cv2.waitKey(0)
             else:
                 break
         cap.release()
+        print('done')
 
         seq_length = len(imgs)
 
         if seq_length < self.fix_seq_length + self.num_pts:
-            raise RuntimeError('The length of sequence', seq_sample_path, 'is too short',
-                               '(%d < %d)' % (seq_length, self.fix_seq_length + self.num_pts))
-        
+            print('The length of sequence', seq_sample_path, 'is too short',
+                  '(%d < %d)' % (seq_length, self.fix_seq_length + self.num_pts))
+            return self.__getitem__(idx+1)
+
         seq_length_delta = seq_length - (self.fix_seq_length + self.num_pts)
         seq_length_delta = np.random.randint(1, seq_length_delta+1)
 
@@ -238,6 +244,7 @@ class Comma2k19SequenceDataset(PlanningDataset):
         imgs = list(Image.fromarray(img) for img in imgs)
         imgs = list(self.transforms(img)[None] for img in imgs)
         input_img = torch.cat(imgs, dim=0)  # [N+1, 3, H, W]
+        del imgs
         input_img = torch.cat((input_img[:-1, ...], input_img[1:, ...]), dim=1)
 
         # poses
@@ -275,8 +282,10 @@ if __name__ == '__main__':
     from utils import draw_trajectory_on_ax
     import matplotlib.pyplot as plt
 
-    dataset = Comma2k19SequenceDataset('data/comma2k19_val_non_overlap.txt', 'data/comma2k19/', 'train', use_memcache=False)
-    for sample in dataset:
+    # dataset = Comma2k19SequenceDataset('data/comma2k19_val_non_overlap.txt', 'data/comma2k19/', 'train', use_memcache=False)
+    dataset = Comma2k19SequenceDataset('data/comma2k19_val_non_overlap.txt', 's3://comma2k19/', 'train', use_memcache=True)
+    for sample in tqdm(dataset):
+        continue
         for k, v in sample.items():
             print(k, ':', v.shape, v.dtype)
         for img, traj in zip(sample['seq_input_img'], sample['seq_future_poses']):
