@@ -17,7 +17,9 @@ def draw_trajectory_on_ax(ax: Axes, trajectories, confs, line_type='o-', transpa
     for idx, (trajectory, conf) in enumerate(zip(trajectories, confs)):
         label = 'gt' if conf == 1 else 'pred%d (%.3f)' % (idx, conf)
         alpha = np.clip(conf, 0.1, None) if transparent else 1.0
-        ax.plot(-trajectory[:, 1], trajectory[:, 0], line_type, label=label, alpha=alpha)
+        ax.plot(trajectory[:, 1],  # - for nuscenes and + for comma 2k19
+                trajectory[:, 0],
+                line_type, label=label, alpha=alpha)
     if xlim is not None:
         ax.set_xlim(*xlim)
     if ylim is not None:

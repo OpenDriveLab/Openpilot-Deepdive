@@ -85,7 +85,9 @@ def debug():
     frame_times = np.load(example_segment + 'global_pose/frame_times')
     print(frame_times.shape)
 
-    print(np.load(example_segment + 'global_pose/frame_orientations').shape)
+    frame_orientation = np.load(example_segment + 'global_pose/frame_orientations')
+    print(frame_orientation.shape)
+    print(frame_orientation.dtype)
 
 
 def main():
@@ -105,6 +107,19 @@ def main():
     frame_times = np.load(example_segment + 'global_pose/frame_times')
     print(frame_times.shape)
 
+    # === Generating non-overlaping seqs ===
+    sequences = glob.glob('data/comma2k19/*/*/*/video.hevc')
+    sequences = [seq.replace('data/comma2k19/', '').replace('/video.hevc', '') for seq in sequences]
+    seq_names = list(set([seq.split('/')[1] for seq in sequences]))
+    num_seqs = len(seq_names)
+    num_train = int(0.8 * num_seqs)
+    train_seq_names = seq_names[:num_train]
+    with open('data/comma2k19_train_non_overlap.txt', 'w') as f:
+        f.writelines(seq + '\n' for seq in sequences if seq.split('/')[1] in train_seq_names)
+    with open('data/comma2k19_val_non_overlap.txt', 'w') as f:
+        f.writelines(seq + '\n' for seq in sequences if seq.split('/')[1] not in train_seq_names)
+
 
 if __name__ == '__main__':
-    main()
+    # main()
+    debug()

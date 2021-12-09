@@ -195,10 +195,8 @@ class Comma2k19SequenceDataset(PlanningDataset):
 
 
     def _get_cv2_vid(self, path):
-        print(path)
         if self.use_memcache:
             path = self.client.generate_presigned_url(str(path), client_method='get_object', expires_in=3600)
-            print(path)
         return cv2.VideoCapture(path)
 
     def _get_numpy(self, path):
@@ -223,7 +221,6 @@ class Comma2k19SequenceDataset(PlanningDataset):
             else:
                 break
         cap.release()
-        print('done')
 
         seq_length = len(imgs)
 

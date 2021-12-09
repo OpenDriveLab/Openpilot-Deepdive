@@ -1,5 +1,6 @@
 data/*
 lightning_logs/
+runs/
 __pycache__
 vis*/
 *.ckpt
