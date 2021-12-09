@@ -226,7 +226,7 @@ if __name__ == "__main__":
     # data_p = 'p3_10pts_can_bus_%s_temporal.json'
     # train = SequencePlanningDataset(split='train', json_path_pattern=data_p)
     # val = SequencePlanningDataset(split='val', json_path_pattern=data_p)
-    train = Comma2k19SequenceDataset('data/comma2k19_val_non_overlap.txt', 'data/comma2k19/','train', use_memcache=False)
+    train = Comma2k19SequenceDataset('data/comma2k19_train_non_overlap.txt', 'data/comma2k19/','train', use_memcache=False)
     val = Comma2k19SequenceDataset('data/comma2k19_val_non_overlap.txt', 'data/comma2k19/','val', use_memcache=False)
     train_loader = DataLoader(train, args.batch_size, shuffle=True, num_workers=args.n_workers, persistent_workers=True, prefetch_factor=2, pin_memory=True)
     val_loader = DataLoader(val, args.batch_size, num_workers=args.n_workers, persistent_workers=True, prefetch_factor=2, pin_memory=True)

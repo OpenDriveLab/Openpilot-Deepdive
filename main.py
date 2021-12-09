@@ -58,7 +58,7 @@ def setup(rank, world_size):
 
 
 def get_dataloader(rank, world_size, batch_size, pin_memory=False, num_workers=0):
-    train = Comma2k19SequenceDataset('data/comma2k19_val_non_overlap.txt', 'data/comma2k19/','train', use_memcache=False)
+    train = Comma2k19SequenceDataset('data/comma2k19_train_non_overlap.txt', 'data/comma2k19/','train', use_memcache=False)
     val = Comma2k19SequenceDataset('data/comma2k19_val_non_overlap.txt', 'data/comma2k19/','val', use_memcache=False)
 
     train_sampler = DistributedSampler(train, num_replicas=world_size, rank=rank, shuffle=True, drop_last=True)
