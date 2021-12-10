@@ -176,6 +176,15 @@ class Comma2k19SequenceDataset(PlanningDataset):
             ]
         )
 
+        self.warp_matrix = calibration(extrinsic_matrix=np.array([[ 0, -1,  0,    0],
+                                                                  [ 0,  0, -1, 1.22],
+                                                                  [ 1,  0,  0,    0],
+                                                                  [ 0,  0,  0,    1]]),
+                                       cam_intrinsics=np.array([[910, 0, 582],
+                                                                [0, 910, 437],
+                                                                [0,   0,   1]]),
+                                       device_frame_from_road_frame=np.hstack((np.diag([1, -1, -1]), [[0], [0], [1.22]])))
+
         self.use_memcache = use_memcache
         if self.use_memcache:
             self._init_mc_()
@@ -237,6 +246,7 @@ class Comma2k19SequenceDataset(PlanningDataset):
 
         # seq_input_img
         imgs = imgs[seq_start_idx-1: seq_end_idx]  # contains one more img
+        imgs = [cv2.warpPerspective(src=img, M=self.warp_matrix, dsize=(512,256), flags=cv2.WARP_INVERSE_MAP) for img in imgs]
         imgs = [cv2.cvtColor(img, cv2.COLOR_BGR2RGB) for img in imgs]
         imgs = list(Image.fromarray(img) for img in imgs)
         imgs = list(self.transforms(img)[None] for img in imgs)
@@ -248,7 +258,6 @@ class Comma2k19SequenceDataset(PlanningDataset):
         frame_positions = self._get_numpy(self.prefix + self.samples[idx] + '/global_pose/frame_positions')[seq_start_idx: seq_end_idx+self.num_pts]
         frame_orientations = self._get_numpy(self.prefix + self.samples[idx] + '/global_pose/frame_orientations')[seq_start_idx: seq_end_idx+self.num_pts]
 
-        # TODO: Time-Anchor like OpenPilot
         future_poses = []
         for i in range(self.fix_seq_length):
             ecef_from_local = orient.rot_from_quat(frame_orientations[i])
@@ -279,8 +288,8 @@ if __name__ == '__main__':
     from utils import draw_trajectory_on_ax
     import matplotlib.pyplot as plt
 
-    # dataset = Comma2k19SequenceDataset('data/comma2k19_val_non_overlap.txt', 'data/comma2k19/', 'train', use_memcache=False)
-    dataset = Comma2k19SequenceDataset('data/comma2k19_val_non_overlap.txt', 's3://comma2k19/', 'train', use_memcache=True)
+    dataset = Comma2k19SequenceDataset('data/comma2k19_val_non_overlap.txt', 'data/comma2k19/', 'train', use_memcache=False)
+    # dataset = Comma2k19SequenceDataset('data/comma2k19_val_non_overlap.txt', 's3://comma2k19/', 'train', use_memcache=True)
     for sample in tqdm(dataset):
         continue
         for k, v in sample.items():
