@@ -27,8 +27,7 @@ def get_hyperparameters(parser: ArgumentParser):
     parser.add_argument('--batch_size', type=int, default=8)
     parser.add_argument('--lr', type=float, default=1e-4)
     parser.add_argument('--n_workers', type=int, default=8)
-    parser.add_argument('--gpus', type=int, default=1)
-    parser.add_argument('--epochs', type=int, default=1)
+    parser.add_argument('--epochs', type=int, default=10)
 
     parser.add_argument('--resume', type=str, default='')
 
@@ -47,14 +46,9 @@ def get_hyperparameters(parser: ArgumentParser):
 
 
 def setup(rank, world_size):
-    master_addr = 'localhost'
-    master_port = random.randint(30000, 50000)
-    os.environ['MASTER_ADDR'] = master_addr
-    os.environ['MASTER_PORT'] = str(master_port)
-
     torch.cuda.set_device(rank)
-    dist.init_process_group('nccl', rank=rank, world_size=world_size)
-    print('Distributed Environment Initialized at %s:%s' % (master_addr, master_port))
+    dist.init_process_group('nccl', init_method='tcp://localhost:%s' % os.environ['PORT'], rank=rank, world_size=world_size)
+    print('[%.2f]' % time.time(), 'DDP Initialized at %s:%s' % ('localhost', os.environ['PORT']), rank, 'of', world_size, flush=True)
 
 
 def get_dataloader(rank, world_size, batch_size, pin_memory=False, num_workers=0):
@@ -93,6 +87,8 @@ class SequenceBaselineV1(nn.Module):
             optimizer = optim.SGD(model.parameters(), lr=args.lr, momentum=0.9, weight_decay=0.01)
         elif args.optimizer == 'adam':
             optimizer = optim.Adam(model.parameters(), lr=args.lr, weight_decay=0.01)
+        elif args.optimizer == 'adamw':
+            optimizer = optim.AdamW(model.parameters(), lr=args.lr, )
         else:
             raise NotImplementedError
         lr_scheduler = optim.lr_scheduler.StepLR(optimizer, 20, 0.9)
@@ -123,8 +119,6 @@ class SequenceBaselineV1(nn.Module):
 
 
 def main(rank, world_size, args):
-    setup(rank, world_size)
-
     if rank == 0:
         writer = SummaryWriter()
 
@@ -143,17 +137,17 @@ def main(rank, world_size, args):
 
     num_steps = 0
 
-    for epoch in tqdm(range(args.epochs)):
+    for epoch in tqdm(range(args.epochs), disable=(rank != 0)):
         train_dataloader.sampler.set_epoch(epoch)
         
-        for batch_idx, data in enumerate(tqdm(train_dataloader, leave=False)):
+        for batch_idx, data in enumerate(tqdm(train_dataloader, leave=False, disable=(rank != 0))):
             seq_inputs, seq_labels = data['seq_input_img'].cuda(), data['seq_future_poses'].cuda()
             bs = seq_labels.size(0)
             seq_length = seq_labels.size(1)
             
             hidden = torch.zeros((2, bs, 512)).cuda()
             total_loss = 0
-            for t in tqdm(range(seq_length), leave=False):
+            for t in tqdm(range(seq_length), leave=False, disable=(rank != 0)):
                 num_steps += 1
                 inputs, labels = seq_inputs[:, t, :, :, :], seq_labels[:, t, :, :]
                 pred_cls, pred_trajectory, hidden = model(inputs, hidden)
@@ -174,6 +168,8 @@ def main(rank, world_size, args):
                     total_loss.backward()
                     optimizer.step()
                     lr_scheduler.step()
+                    if rank == 0:
+                        writer.add_scalar('loss/total', total_loss, num_steps)
                     total_loss = 0
 
             if not isinstance(total_loss, int):
@@ -181,9 +177,16 @@ def main(rank, world_size, args):
                 total_loss.backward()
                 optimizer.step()
                 lr_scheduler.step()
+                if rank == 0:
+                    writer.add_scalar('loss/total', total_loss, num_steps)
 
-        if (epoch + 1) % 10 == 0:
-            print('skipping val...')
+        if (epoch + 1) % 1 == 0:
+            if rank == 0:
+                # save model
+                ckpt_path = os.path.join(writer.get_logdir(), 'epoch_%d.pth' % epoch)
+                torch.save(model.module.state_dict(), ckpt_path)
+                print('[Epoch %d] checkpoint saved at %s' % (epoch, ckpt_path))
+                print('skipping val...')
             continue
             for batch_idx, data in enumerate(val_dataloader):
                 data = data.cuda()
@@ -193,14 +196,11 @@ def main(rank, world_size, args):
 
 
 if __name__ == "__main__":
+    print('[%.2f]' % time.time(), 'starting job...', os.environ['SLURM_PROCID'], 'of', os.environ['SLURM_NTASKS'], flush=True)
 
     parser = ArgumentParser()
     parser = get_hyperparameters(parser)
     args = parser.parse_args()
 
-    world_size = args.gpus
-    mp.spawn(
-        main,
-        args=(world_size, args),
-        nprocs=world_size
-    )
+    setup(rank=int(os.environ['SLURM_PROCID']), world_size=int(os.environ['SLURM_NTASKS']))
+    main(rank=int(os.environ['SLURM_PROCID']), world_size=int(os.environ['SLURM_NTASKS']), args=args)
