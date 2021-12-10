@@ -29,8 +29,9 @@ medmodel_intrinsics = np.array([
     [0.0,  0.0,                                   1.0]])
 
 
-def calibration(extrinsic_matrix, cam_intrinsics):
-    device_frame_from_road_frame = np.hstack((np.diag([1, -1, -1]), [[0], [0], [1.51]]))
+def calibration(extrinsic_matrix, cam_intrinsics, device_frame_from_road_frame=None):
+    if device_frame_from_road_frame is None:
+        device_frame_from_road_frame = np.hstack((np.diag([1, -1, -1]), [[0], [0], [1.51]]))
     med_frame_from_ground = medmodel_intrinsics@view_frame_from_device_frame@device_frame_from_road_frame[:,(0,1,3)]
     ground_from_med_frame  = np.linalg.inv(med_frame_from_ground)
 
