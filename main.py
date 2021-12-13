@@ -161,13 +161,14 @@ def main(rank, world_size, args):
                     writer.add_scalar('loss/reg_x', reg_loss[0], num_steps)
                     writer.add_scalar('loss/reg_y', reg_loss[1], num_steps)
                     writer.add_scalar('loss/reg_z', reg_loss[2], num_steps)
+                    writer.add_scalar('param/lr', optimizer.param_groups[0]['lr'], num_steps)
 
                 if (t + 1) % model.module.optimize_per_n_step == 0:
                     hidden = hidden.clone().detach()
                     optimizer.zero_grad()
                     total_loss.backward()
+                    torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)  # TODO: move to args
                     optimizer.step()
-                    lr_scheduler.step()
                     if rank == 0:
                         writer.add_scalar('loss/total', total_loss, num_steps)
                     total_loss = 0
@@ -175,11 +176,12 @@ def main(rank, world_size, args):
             if not isinstance(total_loss, int):
                 optimizer.zero_grad()
                 total_loss.backward()
+                torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)  # TODO: move to args
                 optimizer.step()
-                lr_scheduler.step()
                 if rank == 0:
                     writer.add_scalar('loss/total', total_loss, num_steps)
 
+        lr_scheduler.step()
         if (epoch + 1) % 1 == 0:
             if rank == 0:
                 # save model
