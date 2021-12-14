@@ -12,7 +12,11 @@ from torch.utils.data import DataLoader
 
 import torch.distributed as dist
 from torch.utils.data.distributed import DistributedSampler
-from torch.utils.tensorboard import SummaryWriter
+
+if torch.__version__ == 'parrots':
+    from tensorboardX import SummaryWriter
+else:
+    from torch.utils.tensorboard import SummaryWriter
 
 from data import PlanningDataset, SequencePlanningDataset, Comma2k19SequenceDataset
 from model import PlaningNetwork, MultipleTrajectoryPredictionLoss, SequencePlanningNetwork
