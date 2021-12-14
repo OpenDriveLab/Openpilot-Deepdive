@@ -1,10 +1,7 @@
 import os
 import time
 import random
-from pytorch_lightning.utilities.types import LRSchedulerType
-from torch.optim import lr_scheduler
 from tqdm import tqdm
-import matplotlib.pyplot as plt
 from argparse import ArgumentParser
 
 import torch
@@ -14,7 +11,6 @@ from torch import optim
 from torch.utils.data import DataLoader
 
 import torch.distributed as dist
-import torch.multiprocessing as mp
 from torch.utils.data.distributed import DistributedSampler
 from torch.utils.tensorboard import SummaryWriter
 
