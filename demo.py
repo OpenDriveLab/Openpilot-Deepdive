@@ -1,6 +1,8 @@
-from utils import draw_trajectory_on_ax
+from utils import draw_path, draw_trajectory_on_ax
 import torch
+import cv2
 import numpy as np
+from tqdm import tqdm
 from torch.nn.functional import softmax
 
 from data import PlanningDataset, Comma2k19SequenceDataset
@@ -9,7 +11,7 @@ from torch.utils.data import DataLoader
 
 import matplotlib.pyplot as plt
 
-val = Comma2k19SequenceDataset('data/comma2k19_demo.txt', 'data/comma2k19/','val', use_memcache=False, return_origin=True)
+val = Comma2k19SequenceDataset('data/comma2k19_demo.txt', 'data/comma2k19/','demo', use_memcache=False, return_origin=True)
 val_loader = DataLoader(val, 1, num_workers=0, shuffle=True)
 
 planning_v0 = SequenceBaselineV1(5, 33, 1.0, 0.0, 'adamw')
@@ -28,7 +30,7 @@ for b_idx, batch in enumerate(val_loader):
     
     hidden = torch.zeros((2, bs, 512), device=seq_inputs.device)
 
-    for t in range(seq_length):
+    for t in tqdm(range(seq_length)):
 
         with torch.no_grad():
             inputs, labels = seq_inputs[:, t, :, :, :], seq_labels[:, t, :, :]
@@ -46,7 +48,7 @@ for b_idx, batch in enumerate(val_loader):
         # fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(nrows=2, ncols=2, figsize=(16, 9))
         # fig = plt.figure(figsize=(16, 9), constrained_layout=True)
         # fig = plt.figure(figsize=(12, 9.9))  # W, H
-        fig = plt.figure(figsize=(12, 9.9))  # W, H
+        fig = plt.figure(figsize=(12, 9))  # W, H
         spec = fig.add_gridspec(3, 3)  # H, W
         ax1 = fig.add_subplot(spec[ 2,  0])  # H, W
         ax2 = fig.add_subplot(spec[ 2,  1])
@@ -64,9 +66,16 @@ for b_idx, batch in enumerate(val_loader):
         trajectories = list(pred_trajectory) + list(labels)
         confs = list(pred_conf) + [1, ]
         ax3 = draw_trajectory_on_ax(ax3, trajectories, confs, ylim=(0, 200))
+        ax3.set_title('Current Metric: #TODO')
         ax3.grid()
 
-        ax4.imshow(origin_imgs[0, t, :, :, :].numpy())
+        origin_img = origin_imgs[0, t, :, :, :].numpy()
+        overlay = origin_img.copy()
+        draw_path(pred_trajectory[pred_conf.argmax(), :], overlay, width=1, height=1.2, fill_color=(255,255,255), line_color=(0,255,0))
+        origin_img = 0.5 * origin_img + 0.5 * overlay
+        draw_path(pred_trajectory[pred_conf.argmax(), :], origin_img, width=1, height=1.2, fill_color=None, line_color=(0,255,0))
+
+        ax4.imshow(origin_img.astype(np.uint8))
         ax4.set_title('project on current frame')
         ax4.axis('off')
 
@@ -85,7 +94,7 @@ for b_idx, batch in enumerate(val_loader):
 
         # ax4.legend()
         plt.tight_layout()
-        plt.savefig('vis/comma2k19_parrots_M5_epoch21/%08d.png' % img_idx, pad_inches=0.5, bbox_inches='tight')
+        plt.savefig('vis/comma2k19_parrots_M5_epoch21/%08d.png' % img_idx, pad_inches=0.2, bbox_inches='tight')
         img_idx += 1
         # plt.show()
         plt.close(fig)
