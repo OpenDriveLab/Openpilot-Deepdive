@@ -155,7 +155,7 @@ class SequencePlanningDataset(PlanningDataset):
 
 
 class Comma2k19SequenceDataset(PlanningDataset):
-    def __init__(self, split_txt_path, prefix, mode, use_memcache=True):
+    def __init__(self, split_txt_path, prefix, mode, use_memcache=True, return_origin=False):
         self.split_txt_path = split_txt_path
         self.prefix = prefix
 
@@ -189,6 +189,8 @@ class Comma2k19SequenceDataset(PlanningDataset):
         if self.use_memcache:
             self._init_mc_()
 
+        self.return_origin = return_origin
+
         # from OpenPilot
         self.num_pts = 10 * 20  # 10 s * 20 Hz = 200 frames
         self.t_anchors = np.array(
@@ -221,12 +223,15 @@ class Comma2k19SequenceDataset(PlanningDataset):
         if (cap.isOpened() == False):
             raise RuntimeError
         imgs = []  # <--- all frames here
+        origin_imgs = []
         while (cap.isOpened()):
             ret, frame = cap.read()
             if ret == True:
                 imgs.append(frame)
                 # cv2.imshow('frame', frame)
                 # cv2.waitKey(0)
+                if self.return_origin:
+                    origin_imgs.append(frame)
             else:
                 break
         cap.release()
@@ -272,7 +277,7 @@ class Comma2k19SequenceDataset(PlanningDataset):
             future_poses.append(interp_positions)
         future_poses = torch.tensor(future_poses, dtype=torch.float32)
 
-        return dict(
+        rtn_dict = dict(
             seq_input_img=input_img,  # torch.Size([N, 6, 128, 256])
             seq_future_poses=future_poses,  # torch.Size([N, num_pts, 3])
             # camera_intrinsic=torch.tensor(seq_samples[0]['camera_intrinsic']),
@@ -280,6 +285,15 @@ class Comma2k19SequenceDataset(PlanningDataset):
             # camera_translation_inv=torch.tensor(seq_samples[0]['camera_translation_inv']),
             # camera_rotation_matrix_inv=torch.tensor(seq_samples[0]['camera_rotation_matrix_inv']),
         )
+
+        # For DEMO
+        if self.return_origin:
+            origin_imgs = origin_imgs[seq_start_idx: seq_end_idx]
+            origin_imgs = [torch.tensor(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))[None] for img in origin_imgs]
+            origin_imgs = torch.cat(origin_imgs, dim=0)  # N, H_ori, W_ori, 3
+            rtn_dict['origin_imgs'] = origin_imgs
+
+        return rtn_dict
 
 
 if __name__ == '__main__':

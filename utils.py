@@ -14,12 +14,17 @@ def draw_trajectory_on_ax(ax: Axes, trajectories, confs, line_type='o-', transpa
     confs: List of numbers, 1 means gt
     '''
 
+    # get the max conf
+    max_conf = max([conf for conf in confs if conf != 1])
+
     for idx, (trajectory, conf) in enumerate(zip(trajectories, confs)):
         label = 'gt' if conf == 1 else 'pred%d (%.3f)' % (idx, conf)
-        alpha = np.clip(conf, 0.1, None) if transparent else 1.0
+        alpha = 1.0
+        if transparent:
+            alpha = 1.0 if conf == max_conf else np.clip(conf, 0.1, None)
         ax.plot(trajectory[:, 1],  # - for nuscenes and + for comma 2k19
                 trajectory[:, 0],
-                line_type, label=label, alpha=alpha)
+                line_type, label=label, alpha=alpha, linewidth=2 if alpha == 1.0 else 1)
     if xlim is not None:
         ax.set_xlim(*xlim)
     if ylim is not None:
