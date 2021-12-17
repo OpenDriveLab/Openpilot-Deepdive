@@ -1,10 +1,16 @@
 import cv2
 import numpy as np
+import matplotlib
 import matplotlib.pyplot as plt
 from matplotlib.axes import Axes
 import torch
 from torch import nn
 import torch.nn.functional as F
+
+from utils_comma2k19.camera import img_from_device, denormalize, view_frame_from_device_frame
+from cycler import cycler
+matplotlib.rcParams['axes.prop_cycle'] = cycler('color', 
+    ['#1f77b4', '#ff7f0e', '#2ca02c', '#9467bd', '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf'])
 
 
 def draw_trajectory_on_ax(ax: Axes, trajectories, confs, line_type='o-', transparent=True, xlim=(-30, 30), ylim=(0, 100)):
@@ -14,12 +20,20 @@ def draw_trajectory_on_ax(ax: Axes, trajectories, confs, line_type='o-', transpa
     confs: List of numbers, 1 means gt
     '''
 
+    # get the max conf
+    max_conf = max([conf for conf in confs if conf != 1])
+
     for idx, (trajectory, conf) in enumerate(zip(trajectories, confs)):
         label = 'gt' if conf == 1 else 'pred%d (%.3f)' % (idx, conf)
-        alpha = np.clip(conf, 0.1, None) if transparent else 1.0
+        alpha = 1.0
+        if transparent:
+            alpha = 1.0 if conf == max_conf else np.clip(conf, 0.1, None)
+        plot_args = dict(label=label, alpha=alpha, linewidth=2 if alpha == 1.0 else 1)
+        if label == 'gt':
+            plot_args['color'] = '#d62728'
         ax.plot(trajectory[:, 1],  # - for nuscenes and + for comma 2k19
                 trajectory[:, 0],
-                line_type, label=label, alpha=alpha)
+                line_type, **plot_args)
     if xlim is not None:
         ax.set_xlim(*xlim)
     if ylim is not None:
@@ -108,3 +122,30 @@ def warp(img, w_offsets, h_offsets):
     transformed_image = cv2.warpPerspective(img, transform_matrix, (w, h))
 
     return transformed_image
+
+
+def draw_path(device_path, img, width=1, height=1.2, fill_color=(128,0,255), line_color=(0,255,0)):
+    # device_path: N, 3
+    device_path_l = device_path + np.array([0, 0, height])                                                                    
+    device_path_r = device_path + np.array([0, 0, height])                                                                    
+    device_path_l[:,1] -= width                                                                                               
+    device_path_r[:,1] += width
+
+    img_points_norm_l = img_from_device(device_path_l)
+    img_points_norm_r = img_from_device(device_path_r)
+
+    img_pts_l = denormalize(img_points_norm_l)
+    img_pts_r = denormalize(img_points_norm_r)
+    # filter out things rejected along the way
+    valid = np.logical_and(np.isfinite(img_pts_l).all(axis=1), np.isfinite(img_pts_r).all(axis=1))
+    img_pts_l = img_pts_l[valid].astype(int)
+    img_pts_r = img_pts_r[valid].astype(int)
+
+    for i in range(1, len(img_pts_l)):
+        u1,v1,u2,v2 = np.append(img_pts_l[i-1], img_pts_r[i-1])
+        u3,v3,u4,v4 = np.append(img_pts_l[i], img_pts_r[i])
+        pts = np.array([[u1,v1],[u2,v2],[u4,v4],[u3,v3]], np.int32).reshape((-1,1,2))
+        if fill_color:
+            cv2.fillPoly(img,[pts],fill_color)
+        if line_color:
+            cv2.polylines(img,[pts],True,line_color)
