@@ -184,14 +184,14 @@ def main(rank, world_size, args):
             model.eval()
             with torch.no_grad():
                 saved_metric_epoch = get_val_metric_keys()
-                for batch_idx, data in enumerate(val_dataloader):
+                for batch_idx, data in tqdm(enumerate(val_dataloader), leave=False, disable=disable_tqdm, ncols=10):
                     seq_inputs, seq_labels = data['seq_input_img'].cuda(), data['seq_future_poses'].cuda()
 
                     bs = seq_labels.size(0)
                     seq_length = seq_labels.size(1)
                     
                     hidden = torch.zeros((2, bs, 512), device=seq_inputs.device)
-                    for t in tqdm(range(seq_length), leave=False, disable=disable_tqdm):
+                    for t in tqdm(range(seq_length), leave=False, disable=disable_tqdm, ncols=10):
                         inputs, labels = seq_inputs[:, t, :, :, :], seq_labels[:, t, :, :]
                         pred_cls, pred_trajectory, hidden = model(inputs, hidden)
 
