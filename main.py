@@ -1,4 +1,5 @@
 import os
+import sys
 import time
 import random
 from tqdm import tqdm
@@ -29,6 +30,8 @@ def get_hyperparameters(parser: ArgumentParser):
     parser.add_argument('--lr', type=float, default=1e-4)
     parser.add_argument('--n_workers', type=int, default=8)
     parser.add_argument('--epochs', type=int, default=10)
+    parser.add_argument('--log_per_n_step', type=int, default=20)
+    parser.add_argument('--val_per_n_epoch', type=int, default=1)
 
     parser.add_argument('--resume', type=str, default='')
 
@@ -54,7 +57,7 @@ def setup(rank, world_size):
 
 def get_dataloader(rank, world_size, batch_size, pin_memory=False, num_workers=0):
     train = Comma2k19SequenceDataset('data/comma2k19_train_non_overlap.txt', 's3://comma2k19/','train', use_memcache=True)
-    val = Comma2k19SequenceDataset('data/comma2k19_val_debug.txt', 's3://comma2k19/','demo', use_memcache=True)
+    val = Comma2k19SequenceDataset('data/comma2k19_val_non_overlap.txt', 's3://comma2k19/','demo', use_memcache=True)
 
     if torch.__version__ == 'parrots':
         dist_sampler_params = dict(num_replicas=world_size, rank=rank, shuffle=True)
@@ -126,55 +129,56 @@ def main(rank, world_size, args):
     loss = MultipleTrajectoryPredictionLoss(args.mtp_alpha, args.M, args.num_pts, distance_type='angle')
 
     num_steps = 0
-    disable_tqdm = (rank != 0)
+    disable_tqdm = True or (rank != 0)
 
-    for epoch in tqdm(range(args.epochs), disable=disable_tqdm):
+    for epoch in tqdm(range(args.epochs), disable=disable_tqdm, position=0):
         train_dataloader.sampler.set_epoch(epoch)
         
-        # for batch_idx, data in enumerate(tqdm(train_dataloader, leave=False, disable=disable_tqdm)):
-        #     seq_inputs, seq_labels = data['seq_input_img'].cuda(), data['seq_future_poses'].cuda()
-        #     bs = seq_labels.size(0)
-        #     seq_length = seq_labels.size(1)
+        for batch_idx, data in enumerate(tqdm(train_dataloader, leave=False, disable=disable_tqdm, position=1)):
+            seq_inputs, seq_labels = data['seq_input_img'].cuda(), data['seq_future_poses'].cuda()
+            bs = seq_labels.size(0)
+            seq_length = seq_labels.size(1)
             
-        #     hidden = torch.zeros((2, bs, 512)).cuda()
-        #     total_loss = 0
-        #     for t in tqdm(range(seq_length), leave=False, disable=disable_tqdm):
-        #         num_steps += 1
-        #         inputs, labels = seq_inputs[:, t, :, :, :], seq_labels[:, t, :, :]
-        #         pred_cls, pred_trajectory, hidden = model(inputs, hidden)
+            hidden = torch.zeros((2, bs, 512)).cuda()
+            total_loss = 0
+            for t in tqdm(range(seq_length), leave=False, disable=disable_tqdm, position=2):
+                num_steps += 1
+                inputs, labels = seq_inputs[:, t, :, :, :], seq_labels[:, t, :, :]
+                pred_cls, pred_trajectory, hidden = model(inputs, hidden)
 
-        #         cls_loss, reg_loss = loss(pred_cls, pred_trajectory, labels)
-        #         total_loss += (cls_loss + args.mtp_alpha * reg_loss.mean()) / model.module.optimize_per_n_step
+                cls_loss, reg_loss = loss(pred_cls, pred_trajectory, labels)
+                total_loss += (cls_loss + args.mtp_alpha * reg_loss.mean()) / model.module.optimize_per_n_step
             
-        #         if rank == 0:
-        #             # TODO: add a customized log function
-        #             writer.add_scalar('loss/cls', cls_loss, num_steps)
-        #             writer.add_scalar('loss/reg', reg_loss.mean(), num_steps)
-        #             writer.add_scalar('loss/reg_x', reg_loss[0], num_steps)
-        #             writer.add_scalar('loss/reg_y', reg_loss[1], num_steps)
-        #             writer.add_scalar('loss/reg_z', reg_loss[2], num_steps)
-        #             writer.add_scalar('param/lr', optimizer.param_groups[0]['lr'], num_steps)
+                if rank == 0 and (num_steps + 1) % args.log_per_n_step == 0:
+                    # TODO: add a customized log function
+                    writer.add_scalar('train/epoch', epoch, num_steps)
+                    writer.add_scalar('loss/cls', cls_loss, num_steps)
+                    writer.add_scalar('loss/reg', reg_loss.mean(), num_steps)
+                    writer.add_scalar('loss/reg_x', reg_loss[0], num_steps)
+                    writer.add_scalar('loss/reg_y', reg_loss[1], num_steps)
+                    writer.add_scalar('loss/reg_z', reg_loss[2], num_steps)
+                    writer.add_scalar('param/lr', optimizer.param_groups[0]['lr'], num_steps)
 
-        #         if (t + 1) % model.module.optimize_per_n_step == 0:
-        #             hidden = hidden.clone().detach()
-        #             optimizer.zero_grad()
-        #             total_loss.backward()
-        #             torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)  # TODO: move to args
-        #             optimizer.step()
-        #             if rank == 0:
-        #                 writer.add_scalar('loss/total', total_loss, num_steps)
-        #             total_loss = 0
+                if (t + 1) % model.module.optimize_per_n_step == 0:
+                    hidden = hidden.clone().detach()
+                    optimizer.zero_grad()
+                    total_loss.backward()
+                    torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)  # TODO: move to args
+                    optimizer.step()
+                    if rank == 0:
+                        writer.add_scalar('loss/total', total_loss, num_steps)
+                    total_loss = 0
 
-        #     if not isinstance(total_loss, int):
-        #         optimizer.zero_grad()
-        #         total_loss.backward()
-        #         torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)  # TODO: move to args
-        #         optimizer.step()
-        #         if rank == 0:
-        #             writer.add_scalar('loss/total', total_loss, num_steps)
+            if not isinstance(total_loss, int):
+                optimizer.zero_grad()
+                total_loss.backward()
+                torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)  # TODO: move to args
+                optimizer.step()
+                if rank == 0:
+                    writer.add_scalar('loss/total', total_loss, num_steps)
 
         lr_scheduler.step()
-        if (epoch + 1) % 1 == 0:  # TODO: Add to args
+        if (epoch + 1) % args.val_per_n_epoch == 0:
             if rank == 0:
                 # save model
                 ckpt_path = os.path.join(writer.log_dir, 'epoch_%d.pth' % epoch)
@@ -184,14 +188,14 @@ def main(rank, world_size, args):
             model.eval()
             with torch.no_grad():
                 saved_metric_epoch = get_val_metric_keys()
-                for batch_idx, data in enumerate(tqdm(val_dataloader, leave=False, ncols=10)):
+                for batch_idx, data in enumerate(tqdm(val_dataloader, leave=False, disable=disable_tqdm, position=1)):
                     seq_inputs, seq_labels = data['seq_input_img'].cuda(), data['seq_future_poses'].cuda()
 
                     bs = seq_labels.size(0)
                     seq_length = seq_labels.size(1)
                     
                     hidden = torch.zeros((2, bs, 512), device=seq_inputs.device)
-                    for t in tqdm(range(seq_length), leave=False, disable=disable_tqdm):
+                    for t in tqdm(range(seq_length), leave=False, disable=True, position=2):
                         inputs, labels = seq_inputs[:, t, :, :, :], seq_labels[:, t, :, :]
                         pred_cls, pred_trajectory, hidden = model(inputs, hidden)
 
@@ -210,20 +214,17 @@ def main(rank, world_size, args):
                     metric_single[i] = np.mean(saved_metric_epoch[k])
                     counter_single[i] = len(saved_metric_epoch[k])
 
-                metric_gather = [torch.zeros((len(saved_metric_epoch), ), dtype=torch.float32, device='cuda') for _ in range(world_size)]
-                counter_gather = [torch.zeros((len(saved_metric_epoch), ), dtype=torch.int32, device='cuda') for _ in range(world_size)]
-                dist.all_gather(metric_gather, metric_single)
-                dist.all_gather(counter_gather, counter_single)
+                metric_gather = [torch.zeros((len(saved_metric_epoch), ), dtype=torch.float32, device='cuda')[None] for _ in range(world_size)]
+                counter_gather = [torch.zeros((len(saved_metric_epoch), ), dtype=torch.int32, device='cuda')[None] for _ in range(world_size)]
+                dist.all_gather(metric_gather, metric_single[None])
+                dist.all_gather(counter_gather, counter_single[None])
 
                 if rank == 0:
-                    metric_gather = torch.vstack(metric_gather)  # [world_size, num_metric_keys]
-                    counter_gather = torch.vstack(counter_gather)  # [world_size, num_metric_keys]
-                    print(metric_gather)
-                    print(counter_gather)
-                    metric_gather = metric_gather.mean(dim=0)
-                    print(metric_gather)
+                    metric_gather = torch.cat(metric_gather, dim=0)  # [world_size, num_metric_keys]
+                    counter_gather = torch.cat(counter_gather, dim=0)  # [world_size, num_metric_keys]
+                    metric_gather_weighted_mean = (metric_gather * counter_gather).sum(0) / counter_gather.sum(0)
                     for i, k in enumerate(sorted(saved_metric_epoch.keys())):
-                        writer.add_scalar(k, metric_gather[i], num_steps)
+                        writer.add_scalar(k, metric_gather_weighted_mean[i], num_steps)
                 dist.barrier()
 
             model.train()
