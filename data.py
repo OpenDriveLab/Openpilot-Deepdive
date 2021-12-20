@@ -163,6 +163,9 @@ class Comma2k19SequenceDataset(PlanningDataset):
         self.samples = [i.strip() for i in self.samples]
 
         assert mode in ('train', 'val', 'demo')
+        if self.mode == 'demo':
+            print('Warning: DEMO mode is on.')
+
         self.mode = mode
         self.fix_seq_length = 800 if mode == 'train' else 800
 
@@ -240,7 +243,6 @@ class Comma2k19SequenceDataset(PlanningDataset):
         seq_length = len(imgs)
 
         if self.mode == 'demo':
-            print('Warning: DEMO mode is on.')
             self.fix_seq_length = seq_length - self.num_pts - 1
 
         if seq_length < self.fix_seq_length + self.num_pts:
