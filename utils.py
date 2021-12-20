@@ -83,6 +83,28 @@ def get_val_metric(pred_cls, pred_trajectory, labels, namespace='val'):
     return rtn_dict
 
 
+def get_val_metric_keys(namespace='val'):
+    rtn_dict = dict()
+    rtn_dict.update({'l2_dist': [], 'cls_acc': []})
+
+    # New Metric
+    distance_splits = ((0, 10), (10, 20), (20, 30), (30, 50), (50, 1000))
+    AP_thresholds = (0.5, 1, 2)
+
+    for min_dst, max_dst in distance_splits:
+        rtn_dict.update({'eucliden_%d_%d' % (min_dst, max_dst): []})  # [sum(mask), ]
+        rtn_dict.update({'eucliden_x_%d_%d' % (min_dst, max_dst): []})  # [sum(mask), ]
+        rtn_dict.update({'eucliden_y_%d_%d' % (min_dst, max_dst): []})  # [sum(mask), ]
+        for AP_threshold in AP_thresholds:
+            rtn_dict.update({'AP_%d_%d_%s' % (min_dst, max_dst, AP_threshold): []})
+
+    # add namespace
+    if namespace is not None:
+        for k in list(rtn_dict.keys()):
+            rtn_dict['%s/%s' % (namespace, k)] = rtn_dict.pop(k)
+    return rtn_dict
+
+
 def generate_random_params_for_warp(img, random_rate=0.1):
     h, w = img.shape[:2]
 
