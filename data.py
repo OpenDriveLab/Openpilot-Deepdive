@@ -163,10 +163,10 @@ class Comma2k19SequenceDataset(PlanningDataset):
         self.samples = [i.strip() for i in self.samples]
 
         assert mode in ('train', 'val', 'demo')
+        self.mode = mode
         if self.mode == 'demo':
             print('Warning: DEMO mode is on.')
 
-        self.mode = mode
         self.fix_seq_length = 800 if mode == 'train' else 800
 
         self.transforms = transforms.Compose(
