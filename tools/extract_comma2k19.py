@@ -19,7 +19,7 @@ def debug():
     # matplotlib.use('Qt5Agg')
 
 
-    example_segment = 'data/comma2k19/Chunk_1/b0c9d2329ad1606b|2018-07-27--06-03-57/3/'
+    example_segment = '/data/comma2k19/Chunk_1/b0c9d2329ad1606b|2018-07-27--06-03-57/3/'
 
     lr = LogReader(example_segment + 'raw_log.bz2')
     # make list of logs
@@ -33,6 +33,20 @@ def debug():
     #  'sensorEvents', 'sendcan', 'carState', 'gpsLocationExternal', 'clocks', 'ubloxRaw', 
     #  'gpsNMEA', 'qcomGnssDEPRECATD', 'liveMpcDEPRECATED', 'can', 'liveCalibration', 
     #  'gpsLocationDEPRECATED', 'logMessage'}
+
+    for l in logs:
+        if l.which() == 'liveCalibration':
+            print(l.logMonoTime)
+            # ( logMonoTime = 9341060590081,
+                # liveCalibration = (
+                #     calStatus = 0,
+                #     calCycle = 0,
+                #     calPerc = 4,
+                #     extrinsicMatrix = [-0.011214791, 0.99993712, 4.6309424e-06, -5.5571295e-06, 0.035038017, 0.00038834036, 0.99938589, -1.1992631, -0.99932307, -0.011208066, 0.03504017, -0.0420482],
+                #     warpMatrix2DEPRECATED = [1.2499999, 0.00048545594, 394.6611, -0.00048545594, 1.2499999, 379.4877, 0, 0, 1],
+                #     validBlocks = 0 ),
+            # valid = true )
+            input('Press any key to continue...')
 
     # we can plot the speed of the car by getting
     # all the carState logs
@@ -54,7 +68,7 @@ def debug():
     frame_count = fr.frame_count
 
     # 34MB -> 1GB+!! that is too large
-    # for i in range(frame_count):
+    # for i in range(frame_count):l
     #     img = fr.get(i, pix_fmt='rgb24')[0]
     #     cv2.imwrite(example_segment + 'ext/%04d.png' % i, img)
 

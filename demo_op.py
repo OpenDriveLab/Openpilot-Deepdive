@@ -12,17 +12,22 @@ from torch.utils.data import DataLoader
 
 import matplotlib.pyplot as plt
 
+# op-demo
+op_data = np.load('openpilot_result.npy', allow_pickle=True).item()
+op_pred = op_data['pred']
+op_conf = op_data['confidence']
+op_gt = op_data['gt']
+
 # val = Comma2k19SequenceDataset('data/comma2k19_demo.txt', 'data/comma2k19/','demo', use_memcache=False, return_origin=True)
 val = Comma2k19SequenceDataset('data/comma2k19_demo.txt', 'data/comma2k19/','demo', use_memcache=False, return_origin=True)
 val_loader = DataLoader(val, 1, num_workers=0, shuffle=False)
 
-planning_v0 = SequenceBaselineV1(5, 33, 1.0, 0.0, 'adamw')
-planning_v0.load_state_dict(torch.load('vis/M5_epoch_94.pth'))
-planning_v0.eval().cuda()
-
-seq_idx = 0
+seq_idx = 2
+overall_batch_idx_list = [60861]
+# overall_batch_idx_list = [156748, 98816]
 for b_idx, batch in enumerate(val_loader):
-    os.mkdir('vis/M5_DEMO_%04d' % seq_idx)
+    overall_batch_idx = overall_batch_idx_list[b_idx]
+    os.mkdir('vis/OP_DEMO_%04d' % seq_idx)
     seq_inputs, seq_labels = batch['seq_input_img'].cuda(), batch['seq_future_poses'].cuda()
     origin_imgs = batch['origin_imgs']
     # camera_rotation_matrix_inv=batch['camera_rotation_matrix_inv'].numpy()[0]
@@ -36,12 +41,10 @@ for b_idx, batch in enumerate(val_loader):
     img_idx = 0
     for t in tqdm(range(seq_length)):
 
-        with torch.no_grad():
-            inputs, labels = seq_inputs[:, t, :, :, :], seq_labels[:, t, :, :]
-            pred_cls, pred_trajectory, hidden = planning_v0(inputs, hidden)
+        inputs, labels = seq_inputs[:, t, :, :, :], seq_labels[:, t, :, :]
 
-            pred_conf = softmax(pred_cls, dim=-1).cpu().numpy()[0]
-            pred_trajectory = pred_trajectory.reshape(planning_v0.M, planning_v0.num_pts, 3).cpu().numpy()
+        pred_conf = softmax(torch.from_numpy(op_conf[overall_batch_idx]), dim=-1).numpy()
+        pred_trajectory = op_pred[overall_batch_idx].reshape(5, 33, 3)
 
         inputs, labels = inputs.cpu(), labels.cpu()
         vis_img = (inputs.permute(0, 2, 3, 1)[0] * torch.tensor((0.2172, 0.2141, 0.2209, 0.2172, 0.2141, 0.2209)) + torch.tensor((0.3890, 0.3937, 0.3851, 0.3890, 0.3937, 0.3851)) )  * 255
@@ -49,6 +52,8 @@ for b_idx, batch in enumerate(val_loader):
         vis_img = vis_img.clamp(0, 255)
         img_0, img_1 = vis_img[..., :3].numpy().astype(np.uint8), vis_img[..., 3:].numpy().astype(np.uint8)
 
+        align_test = op_gt[overall_batch_idx] != labels.numpy()
+        assert align_test.sum() == 0
         # fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(nrows=2, ncols=2, figsize=(16, 9))
         # fig = plt.figure(figsize=(16, 9), constrained_layout=True)
         # fig = plt.figure(figsize=(12, 9.9))  # W, H
@@ -67,7 +72,7 @@ for b_idx, batch in enumerate(val_loader):
         ax2.set_title('network input [current]')
         ax2.axis('off')
 
-        current_metric = (((pred_trajectory[pred_conf.argmax()] - labels.numpy()) ** 2).sum(-1) ** 0.5).mean().item()
+        current_metric = (((pred_trajectory[pred_conf.argmax()] - labels.numpy()) ** 2).sum(-1) ** 0.5).mean()
 
         trajectories = list(pred_trajectory) + list(labels)
         confs = list(pred_conf) + [1, ]
@@ -100,9 +105,11 @@ for b_idx, batch in enumerate(val_loader):
 
         # ax4.legend()
         plt.tight_layout()
-        plt.savefig('vis/M5_DEMO_%04d/%08d.jpg' % (seq_idx, img_idx), pad_inches=0.2, bbox_inches='tight')
+        plt.savefig('vis/OP_DEMO_%04d/%08d.jpg' % (seq_idx, img_idx), pad_inches=0.2, bbox_inches='tight')
         img_idx += 1
         # plt.show()
         plt.close(fig)
+
+        overall_batch_idx += 1
 
     seq_idx += 1
