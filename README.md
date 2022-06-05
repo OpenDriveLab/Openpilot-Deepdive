@@ -1,7 +1,7 @@
-Reimplementation of OpenPilot (P3 part)
+Level 2 Autonomous Driving on a Single Device: Diving into the Devils of Openpilot
 ---
 
-Just a short way to go.
+This repo contains the training, testing, and visualization code for the reimplemented supercombo model.
 
 ## Folder structure
 
