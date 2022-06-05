@@ -1,3 +1,4 @@
 nuscenes-devkit
 efficientnet_pytorch
-pytorch-lightning
+numpyencoder
+# pytorch-lightning

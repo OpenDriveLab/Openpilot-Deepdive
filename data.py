@@ -13,7 +13,7 @@ from PIL import Image
 from torch.utils.data import Dataset
 from torchvision import transforms
 from utils import warp, generate_random_params_for_warp
-from preprocess_view_transform import calibration
+from view_transform import calibration
 
 import utils_comma2k19.orientation as orient
 import utils_comma2k19.coordinates as coord
@@ -301,85 +301,3 @@ class Comma2k19SequenceDataset(PlanningDataset):
             rtn_dict['origin_imgs'] = origin_imgs
 
         return rtn_dict
-
-
-if __name__ == '__main__':
-    from torch.utils.data import DataLoader
-    from tqdm import tqdm
-    from utils import draw_trajectory_on_ax
-    import matplotlib.pyplot as plt
-
-    dataset = Comma2k19SequenceDataset('data/comma2k19_val_non_overlap.txt', 'data/comma2k19/', 'train', use_memcache=False)
-    # dataset = Comma2k19SequenceDataset('data/comma2k19_val_non_overlap.txt', 's3://comma2k19/', 'train', use_memcache=True)
-    for sample in tqdm(dataset):
-        continue
-        for k, v in sample.items():
-            print(k, ':', v.shape, v.dtype)
-        for img, traj in zip(sample['seq_input_img'], sample['seq_future_poses']):
-            trajectories = list(traj.numpy().reshape(1, 33, 3))  # M, num_pts, 3
-            print(trajectories)
-
-            fig, ax = plt.subplots()
-            ax = draw_trajectory_on_ax(ax, trajectories, [1, ])
-            plt.tight_layout()
-            plt.show()
-
-
-    exit()
-
-    dataset = PlanningDataset(split='val')
-
-    calculate_image_mean_std = False
-    if calculate_image_mean_std:
-        # Calculating the stats of the images
-        psum    = torch.tensor([0.0, 0.0, 0.0])
-        psum_sq = torch.tensor([0.0, 0.0, 0.0])
-
-        # loop through images
-        for img, _ in tqdm(dataset):
-            inputs = img[0:3]
-            inputs = inputs[None]
-            psum    += inputs.sum(axis        = [0, 2, 3])
-            psum_sq += (inputs ** 2).sum(axis = [0, 2, 3])
-        # pixel count
-        count = len(dataset) * 900 * 1600
-
-        # mean and std
-        total_mean = psum / count
-        total_var  = (psum_sq / count) - (total_mean ** 2)
-        total_std  = torch.sqrt(total_var)
-
-        # output
-        print('mean: '  + str(total_mean))  # [0.3890, 0.3937, 0.3851]
-        print('std:  '  + str(total_std))   # [0.2172, 0.2141, 0.2209]
-
-    calculate_poses_mean_std = True
-    if calculate_poses_mean_std:
-        import matplotlib.pyplot as plt
-
-        poses_list = []
-        for _, poses in tqdm(DataLoader(dataset, shuffle=True)):
-            poses_list += list(p.numpy()[None, ] for p in poses[0])
-            if len(poses_list) > 40000:
-                break
-
-        poses = np.concatenate(poses_list, axis=0)
-        print('mean: ', np.mean(poses, axis=0))
-        print('std:  ', np.std(poses, axis=0))
-
-        plt.hist(poses[:, 0], bins=200, )
-        plt.show()
-
-        plt.hist(poses[:, 1], bins=200, )
-        plt.show()
-
-        plt.hist(poses[:, 2], bins=200, )
-        plt.show()
-
-    exit()
-
-    dataloader = DataLoader(dataset, batch_size=8, shuffle=True)
-
-    for img, poses in dataloader:
-        print(img.shape, img.max(), img.min(), img.mean())
-        print(poses.shape, poses.max(), poses.min(), poses.mean())
