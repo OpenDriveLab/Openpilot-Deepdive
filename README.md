@@ -63,6 +63,11 @@ srun -p $PARTITION$ --job-name=openpilot --mpi=pmi2 -n $NUM_GPUS$ --gres=gpu:$NU
 ## Demo
 <img src="https://github.com/OpenPerceptionX/openpilot-reimplementation/blob/main/imgs/demo01.png" width="600px">
 
+# Baselines
+Here we list several baselines to perform trajectory prediction task. You are welcome to pull request and add your work here!
+
+TODO
+
 ***
 # Citation
 Please use the following citation when referencing our repo or [arXiv](https://www.overleaf.com/project/626954666328026cc3d14c98).
