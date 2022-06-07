@@ -25,7 +25,9 @@ In contrast to most traditional autonomous driving solutions where the perceptio
 openpilot-reimplementation 
 ├── tools           - Generate image data from comma2k19 and nuScenes.  
 ├── utils_comma2k19 - comma2k19 dataset processing code.  
-├── data            - link to the nuscenes-all/comma2k19 dataset 
+├── data
+      ├── nuscenes  -> link to the nuscenes-all dataset
+      ├── comma2k19 -> link to the Comma2k19 dataset
 ```
 ***
 # Changelog
