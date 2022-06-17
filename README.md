@@ -67,7 +67,7 @@ srun -p $PARTITION$ --job-name=openpilot --mpi=pmi2 -n $NUM_GPUS$ --gres=gpu:$NU
 ## Demo
 See more demo and test cases on our [webpage](https://sites.google.com/view/openpilot-deepdive/home)！
 
-[<img src="https://github.com/OpenPerceptionX/Openpilot-Deepdive/blob/main/imgs/demo01.png" width="50%">](https://drive.google.com/file/d/1hOnoSFOL6WlS6FrqhjTjyQmKyvOY9HOY/view)
+https://user-images.githubusercontent.com/20351686/174319920-35b3ad34-a15e-43d7-be23-b135c24712e2.mp4
 
 
 ***
