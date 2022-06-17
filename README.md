@@ -1,7 +1,7 @@
 # <p align="center">Openpilot-Deepdive</p>
 **<p align="center">Level 2 Autonomous Driving on a Single Device: Diving into the Devils of Openpilot</p>**
 ![image](https://github.com/OpenPerceptionX/Openpilot-Deepdive/blob/main/imgs/arXiv_fig1.png)
-[**Webpage**](https://sites.google.com/view/openpilot-deepdive/home) | [**Paper**]() | [**Zhihu**](https://www.zhihu.com/people/PerceptionX)
+[**Webpage**](https://sites.google.com/view/openpilot-deepdive/home) | [**Paper**](https://arxiv.org/abs/2206.08176) | [**Zhihu**](https://www.zhihu.com/people/PerceptionX)
 ***
 # Introduction
 
@@ -33,11 +33,11 @@ Openpilot-Deepdive
 ***
 # Changelog
 
-2022-6-10: We released the v1.0 code for Openpilot-reimplementation.
+2022-6-17: We released the v1.0 code for Openpilot-Deepdive.
 
 ***
 # Quick Start Examples
-Before starting, we refer you to read the [arXiv]() to understand the details of our work.
+Before starting, we refer you to read the [arXiv](https://arxiv.org/abs/2206.08176) to understand the details of our work.
 ## Installation
 Clone repo and install requirements.txt in a [Python>=3.7.0](https://www.python.org/) environment, including [PyTorch>=1.7](https://pytorch.org/get-started/locally/).
 
@@ -78,12 +78,12 @@ TODO
 
 ***
 # Citation
-Please use the following citation when referencing our repo or [arXiv]().
+Please use the following citation when referencing our repo or [arXiv](https://arxiv.org/abs/2206.08176).
 ```
 @article{chen2022op,
    title={Level 2 Autonomous Driving on a Single Device: Diving into the Devils of Openpilot},
-   author={Chen, Li and Tang, Tutian and Cai, Zhitian and Li, Yang and Wu Penghao and Li, Hongyang and Shi, Jianping and Qiao, Yu and Yan, Junchi},
-   journal={arXiv preprint arXiv:},
+   author={Li Chen and Tutian Tang and Zhitian Cai and Yang Li and Penghao Wu and Hongyang Li and Jianping Shi and Junchi Yan and Yu Qiao},
+   journal={arXiv preprint arXiv:2206.08176},
    year={2022}
 }
 ```
