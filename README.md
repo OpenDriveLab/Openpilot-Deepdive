@@ -50,7 +50,7 @@ pip install -r requirements.txt  # install
 We train and evaluate our model on two datasets, [nuScenes](https://www.nuscenes.org/nuscenes) and [Comma2k19](https://github.com/commaai/comma2k19).
 The table shows some key features of them.
 
-| Dataset     | Raw<br>FPS (Hz)  | Aligned&<br>FPS (Hz) | Length Per<br>Sequence<br>(Frames/Second) | Altogether<br>Length<br>(Minutes) | Scenario | Locations
+| Dataset     | Raw<br>FPS (Hz)  | Aligned&<br>FPS (Hz) | Length Per<br>Sequence<br>(Frames/Second) | Altogether<br>Length<br>(Minutes) | Scenario | Locations |
 | :----:     |:----:|:----:|:----:|:----:|:----:|:----:|
 | nuScenes | 12 | 2 | 40 / 20 | 330 | Street | America<br>Singapore |  
 | Comma2k19  | 20 | 20 | 1000 / 60 | 2000 | Highway | America | 
@@ -72,9 +72,22 @@ https://user-images.githubusercontent.com/20351686/174319920-35b3ad34-a15e-43d7-
 
 ***
 # Baselines
-Here we list several baselines to perform trajectory prediction task. You are welcome to pull request and add your work here!
+Here we list several baselines to perform trajectory prediction task on different datasets. You are welcome to pull request and add your work here!
 
-TODO
+**nuScenes**
+| Method                | AP@0.5(0-10)  | AP@1(10-20) | AP@1(20-30) | AP@1(30-50) |
+| :----:                |:----:         |:----:       |:----:       |:----:       |
+| Supercombo            | 0.237         | 0.064       | 0.038       | 0.053       |
+| Supercombo-finetuned  | 0.305         | 0.162       | 0.088       | 0.050       |
+| OP-Deepdive (Ours)    | 0.28          | 0.14        | 0.067       |  0.038      |
+
+**Comma2k19**
+| Method                | AP@0.5(0-10)  | AP@1(10-20) | AP@1(20-30) | AP@1(30-50) | AP@2(50+) | Average Jerk* |
+| :----:                |:----:         |:----:       |:----:       |:----:       |:----:     |:----:         |
+| Supercombo            | 0.7966        | 0.6170      | 0.2661      | 0.0889      |  0.0062   |  2.2243       |
+| OP-Deepdive (Ours)    | 0.909         | 0.808       |  0.651      | 0.465       |  0.239    |  4.7959       | 
+
+\*: The lower, the better. To comparison, the average jerk of human driver's trajectories is  0.3232 m/s^2.
 
 ***
 # Citation
