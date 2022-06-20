@@ -24,11 +24,11 @@ In contrast to most traditional autonomous driving solutions where the perceptio
 
 ```
 Openpilot-Deepdive 
-├── tools           - Generate image data from Comma2k19 and nuScenes.  
-├── utils_comma2k19 - Comma2k19 dataset processing code.  
+├── tools           - Tools to generate split on Comma2k19 and nuScenes datasets.  
+├── utils_comma2k19 - The utils provided by comma, copied from `commaai/comma2k19.git/utils`
 ├── data
-      ├── nuscenes  -> link to the nusSenes-all dataset
-      ├── comma2k19 -> link to the Comma2k19 dataset
+      ├── nuscenes  -> soft link to the nusSenes-all dataset
+      ├── comma2k19 -> soft link to the Comma2k19 dataset
 ```
 ***
 # Changelog
