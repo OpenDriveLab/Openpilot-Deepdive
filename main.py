@@ -56,8 +56,8 @@ def setup(rank, world_size):
 
 
 def get_dataloader(rank, world_size, batch_size, pin_memory=False, num_workers=0):
-    train = Comma2k19SequenceDataset('data/comma2k19_train_non_overlap.txt', 's3://comma2k19/','train', use_memcache=True)
-    val = Comma2k19SequenceDataset('data/comma2k19_val_non_overlap.txt', 's3://comma2k19/','demo', use_memcache=True)
+    train = Comma2k19SequenceDataset('data/comma2k19_train_non_overlap.txt', 's3://comma2k19/','train', use_memcache=False)
+    val = Comma2k19SequenceDataset('data/comma2k19_val_non_overlap.txt', 's3://comma2k19/','demo', use_memcache=False)
 
     if torch.__version__ == 'parrots':
         dist_sampler_params = dict(num_replicas=world_size, rank=rank, shuffle=True)
