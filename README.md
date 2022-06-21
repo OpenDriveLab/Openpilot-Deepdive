@@ -55,6 +55,10 @@ The table shows some key features of them.
 | nuScenes | 12 | 2 | 40 / 20 | 330 | Street | America<br>Singapore |  
 | Comma2k19  | 20 | 20 | 1000 / 60 | 2000 | Highway | America | 
 
+Please create a `data` folder and create soft links to the datasets.
+
+For dataset splits, you may create your own by running the scripts in the `tools` folder, or download it in https://github.com/OpenPerceptionX/Openpilot-Deepdive/issues/4.
+
 ## Training
 By default, the batch size and the learning rate are set to be 48 and 1e-4, respectively. A gradient clip of value 1.0 is applied. During training, you can use 4 or 8 NVIDIA V100 GPUs (Multi-GPU times faster). Since there is a GRU module, you need to initialize its hidden state by filling zeros. When using 8 V100 GPUs, it takes approximate 120 hours to train 100 epochs on Comma2k19 dataset . On a single NVIDIA GTX 1080 GPU, the network can inference at a speed of 100 FPS.  
 Configure the above default parameters，and run the following code:
