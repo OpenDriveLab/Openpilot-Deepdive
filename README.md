@@ -13,7 +13,7 @@ In contrast to most traditional autonomous driving solutions where the perceptio
 * [Quick Start](#quick-start-examples) 
     * [Installation](#installation)
     * [Dataset](#dataset)
-    * [Training](#training)
+    * [Training and Testing](#training-and-testing)
     * [Demo](#demo)
 * [Baselines](#baselines)
 * [Citation](#citation) 
