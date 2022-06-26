@@ -34,6 +34,7 @@ Openpilot-Deepdive
 # Changelog
 
 2022-6-17: We released the v1.0 code for Openpilot-Deepdive.
+2022-6-26: We fix some problems and update the readme for using the code on bare-metal machines. Thanks @EliomEssaim and @MicroHest!
 
 ***
 # Quick Start Examples
@@ -59,17 +60,63 @@ Please create a `data` folder and create soft links to the datasets.
 
 For dataset splits, you may create your own by running the scripts in the `tools` folder, or download it in https://github.com/OpenPerceptionX/Openpilot-Deepdive/issues/4.
 
-## Training
-By default, the batch size and the learning rate are set to be 48 and 1e-4, respectively. A gradient clip of value 1.0 is applied. During training, you can use 4 or 8 NVIDIA V100 GPUs (Multi-GPU times faster). Since there is a GRU module, you need to initialize its hidden state by filling zeros. When using 8 V100 GPUs, it takes approximate 120 hours to train 100 epochs on Comma2k19 dataset . On a single NVIDIA GTX 1080 GPU, the network can inference at a speed of 100 FPS.  
-Configure the above default parameters，and run the following code:
+## Training and Testing
+By default, the batch size is set to be 6 per GPU, which consumes 27 GB GPU memory. When using 8 V100 GPUs, it takes approximate 120 hours to train 100 epochs on Comma2k19 dataset. 
+
+**Note**: Our lab use `slurm` to run and manage the tasks. Then, the PyTorch distributed training processes are initialized manually by `slurm`, since the automatic `mp.spawn` may cause unknown problems on slurm clusters. For most people who do not use a cluster, it's okay to launch the training process on bare-metal machines, but you will have to open multiple terminals and set some environmental variables manually if you want to use multiple GPUs. We will explain it below.
+
+**Warning**: Since we have to extract all the frames from the video before sending them into the network, the program is hungry for memory. The actual memory usage is related to `batch_size` and `n_workers`. By default, each process with `n_workers=4` and `batch_size=6` consumes around 40 to 50 GB memory. You'd better open an `htop` to monitor the memory usage, before the machine hangs.
+
+```[bash]
+# Training on a slurm cluster
+export DIST_PORT = 23333  # You may use whatever you want
+export NUM_GPUS = 8
+PORT=$DIST_PORT$ srun -p $PARTITION$ --job-name=openpilot -n $NUM_GPUS$ --gres=gpu:$NUM_GPUS$ --ntasks-per-node=$NUM_GPUS$ python main.py
 ```
-# using slurm to init
-srun -p $PARTITION$ --job-name=openpilot --mpi=pmi2 -n $NUM_GPUS$ --gres=gpu:$NUM_GPUS$ --ntasks-per-node=$NUM_GPUS$ python main.py --batch_size=$BATCH_SIZE$ --nepochs=$NUM_EPOCHS$
+
+```[bash]
+# Training on a bare-metal machine with a single GPU
+PORT=23333 SLURM_PROCID=0 SLURM_NTASKS=1 python main.py
+```
+
+```[bash]
+# Training on a bare-metal machine with multiple GPUs
+# You need to open multiple terminals
+
+# Let's use 4 GPUs for example
+# Terminal 1
+PORT=23333 SLURM_PROCID=0 SLURM_NTASKS=4 python main.py
+# Terminal 2
+PORT=23333 SLURM_PROCID=1 SLURM_NTASKS=4 python main.py
+# Terminal 3
+PORT=23333 SLURM_PROCID=2 SLURM_NTASKS=4 python main.py
+# Terminal 4
+PORT=23333 SLURM_PROCID=3 SLURM_NTASKS=4 python main.py
+# Then, the training process will start after all 4 processes are launched.
+```
+
+By default, the program will not output anything once the training process starts, for the widely-used `tqdm` might be buggy on slurm clusters. So, you may see some debugging info like the one below and the program seems to be stuck.
 
 ```
+[1656218909.68] starting job... 0 of 1
+[1656218911.53] DDP Initialized at localhost:23333 0 of 1
+Comma2k19SequenceDataset: DEMO mode is on.
+Loaded pretrained weights for efficientnet-b2
+```
+
+Don't worry, you can open a tensorboard to see the loss and validation curves.
+```
+tensorboard --logdir runs --bind_all
+```
+
+Otherwise, you may want to parse `--tqdm=True` to show the progress bar in `Terminal 1`.
+
+By default, the test process will be executed once every epoch. So we did not implement the independent test script.
 
 ## Demo
 See more demo and test cases on our [webpage](https://sites.google.com/view/openpilot-deepdive/home)！
+
+You can generate your own demo video using `demo.py`. It will generate some frames in the `./vis` folder. (You may have to create it first.) Then, you can generate a video using `ffmpeg`.
 
 https://user-images.githubusercontent.com/20351686/174319920-35b3ad34-a15e-43d7-be23-b135c24712e2.mp4
 

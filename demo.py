@@ -12,12 +12,16 @@ from torch.utils.data import DataLoader
 
 import matplotlib.pyplot as plt
 
+
+CKPT_PATH = 'vis/M5_epoch_94.pth'  # Path to your checkpoint
+
+# You can generate your own comma2k19_demo.txt to make some fancy demos
 # val = Comma2k19SequenceDataset('data/comma2k19_demo.txt', 'data/comma2k19/','demo', use_memcache=False, return_origin=True)
-val = Comma2k19SequenceDataset('data/comma2k19_demo.txt', 'data/comma2k19/','demo', use_memcache=False, return_origin=True)
+val = Comma2k19SequenceDataset('data/comma2k19_val_non_overlap.txt', 'data/comma2k19/','demo', use_memcache=False, return_origin=True)
 val_loader = DataLoader(val, 1, num_workers=0, shuffle=False)
 
 planning_v0 = SequenceBaselineV1(5, 33, 1.0, 0.0, 'adamw')
-planning_v0.load_state_dict(torch.load('vis/M5_epoch_94.pth'))
+planning_v0.load_state_dict(torch.load(CKPT_PATH))
 planning_v0.eval().cuda()
 
 seq_idx = 0

@@ -165,7 +165,7 @@ class Comma2k19SequenceDataset(PlanningDataset):
         assert mode in ('train', 'val', 'demo')
         self.mode = mode
         if self.mode == 'demo':
-            print('Warning: DEMO mode is on.')
+            print('Comma2k19SequenceDataset: DEMO mode is on.')
 
         self.fix_seq_length = 800 if mode == 'train' else 800
 
@@ -282,7 +282,7 @@ class Comma2k19SequenceDataset(PlanningDataset):
             interp_positions = np.concatenate(interp_positions, axis=1)
             
             future_poses.append(interp_positions)
-        future_poses = torch.tensor(future_poses, dtype=torch.float32)
+        future_poses = torch.tensor(np.array(future_poses), dtype=torch.float32)
 
         rtn_dict = dict(
             seq_input_img=input_img,  # torch.Size([N, 6, 128, 256])

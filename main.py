@@ -26,19 +26,22 @@ from utils import draw_trajectory_on_ax, get_val_metric, get_val_metric_keys
 
 
 def get_hyperparameters(parser: ArgumentParser):
-    parser.add_argument('--batch_size', type=int, default=8)
+    parser.add_argument('--batch_size', type=int, default=6)
     parser.add_argument('--lr', type=float, default=1e-4)
-    parser.add_argument('--n_workers', type=int, default=8)
-    parser.add_argument('--epochs', type=int, default=10)
+    parser.add_argument('--n_workers', type=int, default=4)
+    parser.add_argument('--epochs', type=int, default=100)
     parser.add_argument('--log_per_n_step', type=int, default=20)
     parser.add_argument('--val_per_n_epoch', type=int, default=1)
 
     parser.add_argument('--resume', type=str, default='')
 
-    parser.add_argument('--M', type=int, default=3)
-    parser.add_argument('--num_pts', type=int, default=20)
+    parser.add_argument('--M', type=int, default=5)
+    parser.add_argument('--num_pts', type=int, default=33)
     parser.add_argument('--mtp_alpha', type=float, default=1.0)
     parser.add_argument('--optimizer', type=str, default='sgd')
+    parser.add_argument('--sync_bn', type=bool, default=True)
+    parser.add_argument('--tqdm', type=bool, default=False)
+    parser.add_argument('--optimize_per_n_step', type=int, default=40)
 
     try:
         exp_name = os.environ["SLURM_JOB_ID"]
@@ -56,8 +59,8 @@ def setup(rank, world_size):
 
 
 def get_dataloader(rank, world_size, batch_size, pin_memory=False, num_workers=0):
-    train = Comma2k19SequenceDataset('data/comma2k19_train_non_overlap.txt', 's3://comma2k19/','train', use_memcache=False)
-    val = Comma2k19SequenceDataset('data/comma2k19_val_non_overlap.txt', 's3://comma2k19/','demo', use_memcache=False)
+    train = Comma2k19SequenceDataset('data/comma2k19_train_non_overlap.txt', 'data/comma2k19/','train', use_memcache=False)
+    val = Comma2k19SequenceDataset('data/comma2k19_val_non_overlap.txt', 'data/comma2k19/','demo', use_memcache=False)
 
     if torch.__version__ == 'parrots':
         dist_sampler_params = dict(num_replicas=world_size, rank=rank, shuffle=True)
@@ -77,7 +80,7 @@ def cleanup():
     dist.destroy_process_group()
 
 class SequenceBaselineV1(nn.Module):
-    def __init__(self, M, num_pts, mtp_alpha, lr, optimizer) -> None:
+    def __init__(self, M, num_pts, mtp_alpha, lr, optimizer, optimize_per_n_step=40) -> None:
         super().__init__()
         self.M = M
         self.num_pts = num_pts
@@ -87,7 +90,7 @@ class SequenceBaselineV1(nn.Module):
 
         self.net = SequencePlanningNetwork(M, num_pts)
 
-        self.optimize_per_n_step = 40
+        self.optimize_per_n_step = optimize_per_n_step  # for the gru module
 
     @staticmethod
     def configure_optimizers(args, model):
@@ -114,8 +117,8 @@ def main(rank, world_size, args):
         writer = SummaryWriter()
 
     train_dataloader, val_dataloader = get_dataloader(rank, world_size, args.batch_size, False, args.n_workers)
-    model = SequenceBaselineV1(args.M, args.num_pts, args.mtp_alpha, args.lr, args.optimizer)
-    use_sync_bn = True  # TODO
+    model = SequenceBaselineV1(args.M, args.num_pts, args.mtp_alpha, args.lr, args.optimizer, args.optimize_per_n_step)
+    use_sync_bn = args.sync_bn
     if use_sync_bn:
         model = nn.SyncBatchNorm.convert_sync_batchnorm(model)
     model = model.cuda()
@@ -129,7 +132,7 @@ def main(rank, world_size, args):
     loss = MultipleTrajectoryPredictionLoss(args.mtp_alpha, args.M, args.num_pts, distance_type='angle')
 
     num_steps = 0
-    disable_tqdm = True or (rank != 0)
+    disable_tqdm = (not args.tqdm) or (rank != 0)
 
     for epoch in tqdm(range(args.epochs), disable=disable_tqdm, position=0):
         train_dataloader.sampler.set_epoch(epoch)
