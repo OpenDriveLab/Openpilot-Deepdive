@@ -37,7 +37,7 @@ Openpilot-Deepdive
 
 2022-6-26: We fix some problems and update the readme for using the code on bare-metal machines. Thanks @EliomEssaim and @MicroHest!
 
-2022-7-13: We released the v1.0 code for [Openpilot-Deployment](https://github.com/OpenPerceptionX/Openpilot-Deployment) for dual-model deployment in  the Openpilot framework.
+2022-7-13: We released the v1.0 code for [Openpilot-Deployment](https://github.com/OpenPerceptionX/Openpilot-Deepdive/tree/deploy/Openpilot-Deployment) for dual-model deployment in the Openpilot framework.
 
 ***
 # Quick Start Examples
