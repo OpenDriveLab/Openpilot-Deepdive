@@ -1,6 +1,6 @@
 # <p align="center">Openpilot-Deepdive</p>
 **<p align="center">Level 2 Autonomous Driving on a Single Device: Diving into the Devils of Openpilot</p>**
-![image](https://github.com/OpenPerceptionX/Openpilot-Deepdive/blob/main/imgs/arXiv_fig1.png)
+![image](./imgs/arXiv_fig1.png)
 [**Webpage**](https://sites.google.com/view/openpilot-deepdive/home) | [**Paper**](https://arxiv.org/abs/2206.08176) | [**Zhihu**](https://www.zhihu.com/people/PerceptionX)
 ***
 # Introduction
